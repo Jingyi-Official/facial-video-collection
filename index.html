@@ -1,0 +1,2815 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>人脸表情录制系统 / Facial Expression Recorder</title>
+<style>
+  :root {
+    color-scheme: light;
+    /* ---- 未来感 · 浅色靛蓝配色 ---- */
+    --bg: #eef0ff;                       /* 淡薰衣草底色 */
+    --surface: #ffffff;                  /* 面板 */
+    --surface-2: #fbfbff;                /* 输入框 */
+    --line: rgba(91,95,166,.18);         /* 靛蓝细线描边 */
+    --line-strong: rgba(91,95,166,.34);
+    --text: #2b2f4a;                     /* 深靛墨字 */
+    --muted: #5d6388;                    /* 次级文字 */
+    --faint: #8a8fb4;
+    --accent: #7d8cff;                   /* 电光紫（描边/光晕） */
+    --accent-deep: #5b5fa6;              /* 沉稳靛蓝（文字点缀） */
+    --accent-bright: #5b5fa6;
+    --accent-ink: #ffffff;               /* 按钮文字 */
+    --good: #0ca88f;                     /* 深青 */
+    --warn: #b3861f;
+    --bad: #d4506c;
+    --rec: #e04c64;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(1100px 600px at 50% -10%, rgba(125,140,255,.18), transparent 60%),
+      radial-gradient(900px 500px at 85% 110%, rgba(12,168,143,.08), transparent 60%),
+      radial-gradient(700px 500px at 8% 50%, rgba(91,95,166,.10), transparent 65%),
+      var(--bg);
+    color: var(--text);
+    font-family: "SF Pro Display", "Segoe UI", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    overflow-x: hidden;
+  }
+  ::selection { background: rgba(125,140,255,.30); }
+  #app { min-height: 100%; display: flex; flex-direction: column; }
+  .screen { flex: 1; display: none; flex-direction: column; align-items: center;
+            padding: 24px; position: relative; }
+  .screen.active { display: flex; }
+  .center-box { margin: auto; width: 100%; max-width: 520px; }
+  h1 { font-size: 30px; font-weight: 600; letter-spacing: .3px; text-align: center; margin: 0 0 24px; }
+  h2 { font-size: 26px; font-weight: 600; letter-spacing: .2px; text-align: center; margin: 6px 0; }
+  .sub { font-size: 17px; color: var(--muted); text-align: center; margin: 0 0 10px; }
+  label.field { display: flex; align-items: center; gap: 12px; margin: 12px 0; font-size: 17px; }
+  label.field > span { width: 150px; }
+  input, select, button, textarea { font-size: 16px; font-family: inherit; }
+  input[type=text], input[type=number], select {
+    flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--surface-2); color: var(--text); transition: border-color .15s;
+  }
+  input[type=text]:focus, input[type=number]:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(125,140,255,.18);
+  }
+  button.primary {
+    padding: 10px 26px; border-radius: 8px; border: none; cursor: pointer;
+    background: linear-gradient(135deg, #7d8cff, #5b5fa6); color: var(--accent-ink);
+    font-size: 16px; font-weight: 600; letter-spacing: .2px;
+    box-shadow: 0 2px 14px rgba(125,140,255,.35), inset 0 1px 0 rgba(255,255,255,.18);
+    transition: filter .15s, transform .1s, box-shadow .15s;
+  }
+  button.primary:hover:not(:disabled) { filter: brightness(1.1); box-shadow: 0 2px 20px rgba(125,140,255,.5), inset 0 1px 0 rgba(255,255,255,.18); }
+  button.primary:active:not(:disabled) { transform: translateY(1px); }
+  button.primary:disabled { background: #dcdff0; color: #9aa0c5; cursor: not-allowed; box-shadow: none; }
+  button.secondary {
+    padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line-strong); cursor: pointer;
+    background: transparent; color: var(--text); font-size: 16px; margin: 0 6px;
+    transition: border-color .15s, background .15s;
+  }
+  button.secondary:hover { border-color: var(--accent); background: rgba(125,140,255,.10); }
+  .lang-btns { position: absolute; top: 16px; right: 18px; display: flex; }
+  .lang-btns button { padding: 7px 16px; border: 1px solid var(--line-strong); background: transparent;
+                      color: var(--muted); cursor: pointer; font-size: 14px; transition: color .15s; }
+  .lang-btns button:first-child { border-radius: 8px 0 0 8px; }
+  .lang-btns button:last-child { border-radius: 0 8px 8px 0; border-left: none; }
+  .lang-btns button.active { background: rgba(125,140,255,.16); color: var(--accent-bright); border-color: var(--accent); }
+  .lang-btns button.active + button { border-left: none; }
+  .lang-btns.inline { position: static; justify-content: center; margin-top: 16px; }
+  .instr-text {
+    width: 100%; max-width: 900px; height: 55vh; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--line);
+    padding: 20px; border-radius: 12px; white-space: pre-wrap;
+    font-size: 16px; line-height: 1.55;
+  }
+  /* ---- PIS 结构化排版 ---- */
+  .pis-doc { white-space: normal; font-size: 15px; line-height: 1.65; }
+  .pis-doc p { margin: 0 0 10px; }
+  .pis-doc h3 { font-size: 16.5px; font-weight: 600; color: var(--accent-deep); letter-spacing: .2px;
+                margin: 24px 0 8px; padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+  .pis-doc h3:first-child { margin-top: 0; }
+  .pis-doc ul, .pis-doc ol { margin: 0 0 10px; padding-left: 24px; }
+  .pis-doc li { margin: 4px 0; }
+  .pis-doc h3.instr-important::before { content: "★ "; color: var(--warn); }
+  .pis-doc .instr-note { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .pis-doc hr { border: none; border-top: 1px dashed var(--line-strong); margin: 22px 0; }
+  .pis-meta { margin: 0 0 14px; }
+  .pis-meta > div { margin: 3px 0; }
+  .pis-meta b, .pis-doc .pis-label { color: var(--accent-deep); font-weight: 600; }
+  .pis-meta-sub { color: var(--muted); font-size: 13px; }
+  .pis-todo { color: #c92a2a; background: rgba(201,42,42,.08); border-radius: 4px; padding: 0 3px; font-weight: 600; }
+  .pis-version { color: var(--faint); font-size: 13px; text-align: center; margin-top: 6px; }
+  .check-row { display: flex; align-items: center; gap: 10px; margin: 16px 0; font-size: 16px; }
+  .video-holder {
+    width: 100%; max-width: 1000px; margin: 10px auto; background: #000;
+    position: relative; display: flex; align-items: center; justify-content: center;
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--line);
+    box-shadow: 0 8px 28px rgba(43,47,74,.20);
+  }
+  .video-stage { position: relative; line-height: 0; }
+  .video-stage canvas, .video-stage video { display: block; max-width: 100%; max-height: 60vh; }
+  #overlay, #recOverlay, #testOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  video.hidden-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .status { font-size: 18px; font-weight: bold; margin: 8px 0; min-height: 24px; }
+  .emotion { font-size: 36px; font-weight: bold; margin: 6px 0 2px; text-align: center; }
+  .desc { font-size: 18px; color: var(--accent-bright); max-width: 900px; text-align: center; margin: 0 0 4px; }
+  .hint { font-size: 16px; color: var(--muted); margin: 4px 0; text-align: center; }
+  .btn-row { margin: 10px 0; display: flex; flex-wrap: wrap; justify-content: center; }
+  .progress { font-size: 16px; color: var(--faint); margin: 8px 0; }
+  .big-note { font-size: 17px; color: var(--text); text-align: center; max-width: 700px; }
+  a { color: var(--accent-bright); }
+
+  /* ---- 知情同意（Consent / PIS） ---- */
+  .consent-body { width: 100%; max-width: 900px; text-align: left; }
+  .consent-section-title { font-size: 20px; font-weight: 600; margin: 4px 0; }
+  .consent-section-intro { font-size: 14px; color: var(--muted); margin: 4px 0 10px; line-height: 1.5; }
+  .consent-item { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+                  padding: 14px 16px; margin: 10px 0; }
+  .consent-item .q { font-size: 15px; line-height: 1.55; }
+  .consent-item .qnum { color: var(--accent-bright); font-weight: 600; margin-right: 6px; }
+  .consent-tick { display: flex; align-items: flex-start; gap: 10px; }
+  .consent-tick input { margin-top: 4px; flex: none; }
+  .consent-yn { display: flex; gap: 22px; margin-top: 10px; }
+  .consent-yn label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 15px; }
+  .consent-info { background: rgba(125,140,255,.10); border: 1px solid rgba(91,95,166,.35); border-radius: 10px;
+                  padding: 12px 14px; margin: 12px 0; font-size: 13.5px; color: #454b7e; line-height: 1.55; }
+  .consent-required { color: var(--bad); font-size: 13px; margin-top: 4px; min-height: 16px; }
+  .consent-readonly { background: var(--surface); border: 1px solid var(--line);
+                      border-left: 3px solid var(--accent); color: #3a3f63; }
+  .consent-step { font-size: 15px; color: var(--faint); margin: 4px 0 12px; text-align: center; }
+  .sig-canvas { background: #fff; border: 1px solid var(--line-strong); border-radius: 6px; touch-action: none; display: block;
+                width: 100%; max-width: 480px; height: 160px; cursor: crosshair; }
+  .field-inline { display: flex; align-items: center; gap: 12px; margin: 10px 0; font-size: 15px; flex-wrap: wrap; }
+  .field-inline input[type=text] { flex: 1; min-width: 220px; }
+  textarea.consent-free { width: 100%; min-height: 70px; border-radius: 8px; border: 1px solid var(--line-strong);
+                          background: var(--surface-2); color: var(--text); padding: 8px 10px; resize: vertical; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 2b. 同意完成 -> 开始数据收集（过渡页） -->
+  <section class="screen" id="screen-consent-done">
+    <div class="center-box" style="max-width:660px;text-align:center">
+      <h1 id="cdTitle" style="color:var(--good)"></h1>
+      <p class="big-note" id="cdMsg" style="margin:0 auto 18px"></p>
+      <button class="primary" id="btnConsentDone"></button>
+    </div>
+  </section>
+
+  <!-- 3. 注册（个人信息，在同意之后；第二部分 · 数据收集） -->
+  <section class="screen" id="screen-login">
+    <div class="lang-btns">
+      <button type="button" data-lang="zh">中文</button>
+      <button type="button" data-lang="en">English</button>
+    </div>
+    <div class="consent-step" id="loginPartLabel"></div>
+    <div class="center-box">
+      <h1 id="loginTitle"></h1>
+      <label class="field"><span id="lblName"></span><input type="text" id="fName" /></label>
+      <label class="field"><span id="lblAge"></span><input type="number" id="fAge" min="0" /></label>
+      <label class="field"><span id="lblGender"></span>
+        <select id="fGender"><option>Male</option><option>Female</option><option>Other</option></select></label>
+      <label class="field"><span id="lblNat"></span><input type="text" id="fNat" /></label>
+      <div style="text-align:center;margin-top:22px"><button class="primary" id="btnSubmit"></button></div>
+    </div>
+  </section>
+
+  <!-- 0. 欢迎页（入口，说明两部分） -->
+  <section class="screen active" id="screen-welcome">
+    <div class="center-box" style="max-width:820px">
+      <h1 id="welcomeTitle" style="white-space:nowrap"></h1>
+      <p class="big-note" id="welcomeIntro" style="margin:0 auto 18px"></p>
+      <div class="consent-info consent-readonly" id="welcomePart1"></div>
+      <div class="consent-info consent-readonly" id="welcomePart2"></div>
+      <div style="text-align:center;margin-top:22px"><button class="primary" id="btnWelcomeStart"></button></div>
+      <div class="lang-btns inline">
+        <button type="button" data-lang="zh">中文</button>
+        <button type="button" data-lang="en">English</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1. 参与者须知 PIS（第一部分 · 同意） -->
+  <section class="screen" id="screen-pis">
+    <div class="consent-step" id="pisPartLabel"></div>
+    <h1 id="pisTitle">Participant Information Sheet</h1>
+    <div class="instr-text" id="pisText"></div>
+    <div class="check-row">
+      <input type="checkbox" id="pisChk" />
+      <label for="pisChk" id="pisChkLbl">I have read and understood the Participant Information Sheet above.</label>
+    </div>
+    <div class="btn-row">
+      <button class="secondary" id="btnPisBack">‹ Back</button>
+      <button class="primary" id="btnPisNext">Continue to consent ›</button>
+    </div>
+  </section>
+
+  <!-- 1c. 知情同意书 -->
+  <section class="screen" id="screen-consent">
+    <div class="consent-step" id="consentPartLabel"></div>
+    <h1 id="consentTitle">Consent Form for Facial Expression Video Data Collection</h1>
+    <div class="consent-step" id="consentStep"></div>
+    <div class="consent-body" id="consentBody"></div>
+    <div class="consent-required" id="consentError" style="text-align:center;max-width:900px"></div>
+    <div class="btn-row">
+      <button class="secondary" id="btnConsentBack">‹ Back</button>
+      <button class="primary" id="btnConsentNext">Next ›</button>
+    </div>
+  </section>
+
+  <!-- 2. 须知 -->
+  <section class="screen" id="screen-instr">
+    <div class="consent-step" id="instrPartLabel"></div>
+    <h1 id="instrHeader"></h1>
+    <div class="instr-text" id="instrText"></div>
+    <div class="check-row">
+      <input type="checkbox" id="readChk" />
+      <label for="readChk" id="readChkLbl"></label>
+    </div>
+    <button class="primary" id="btnRead"></button>
+  </section>
+
+  <!-- 3. 摄像头测试 -->
+  <section class="screen" id="screen-camtest">
+    <div class="consent-step" id="camPartLabel"></div>
+    <h2 id="camHeader"></h2>
+    <p class="sub" id="camSub"></p>
+    <div class="field-inline" id="camSelRow" style="justify-content:center;display:none">
+      <span id="camSelLbl"></span><select id="camSelect" style="max-width:340px"></select>
+    </div>
+    <div class="video-holder"><div class="video-stage" id="stageTest">
+      <canvas id="testCanvas"></canvas><canvas id="testOverlay"></canvas>
+    </div></div>
+    <div class="status" id="testStatus" style="color:var(--warn)"></div>
+    <button class="primary" id="btnStartRec" disabled></button>
+  </section>
+
+  <!-- 4. 录制 -->
+  <section class="screen" id="screen-record">
+    <div class="consent-step" id="recPartLabel"></div>
+    <div class="progress" id="progressLbl"></div>
+    <div class="emotion" id="emotionLbl"></div>
+    <div class="desc" id="descLbl"></div>
+    <div class="video-holder"><div class="video-stage" id="stageRec">
+      <canvas id="recCanvas"></canvas>
+      <video id="reviewVideo" class="hidden-src" playsinline muted loop></video>
+      <canvas id="recOverlay"></canvas>
+    </div></div>
+    <div class="status" id="bigStatus" style="color:var(--rec)"></div>
+    <div class="hint" id="hintLbl"></div>
+    <div class="hint" id="uploadInfo" style="color:var(--good)"></div>
+    <div class="btn-row" id="btnRow"></div>
+  </section>
+
+  <!-- 5. 感谢 / 结束 -->
+  <section class="screen" id="screen-finish">
+    <div class="center-box" style="text-align:center;max-width:640px">
+      <div style="font-size:56px;margin-bottom:6px">🎉</div>
+      <h1 id="finishTitle" style="color:var(--good)"></h1>
+      <p class="big-note" id="finishSaved" style="margin:0 auto 14px"></p>
+      <p id="closeNote" style="display:none;font-weight:600;color:var(--good);font-size:21px;
+         background:rgba(12,168,143,.08);border:1px solid rgba(12,168,143,.35);border-radius:10px;padding:14px 18px;margin:8px auto 16px"></p>
+      <button class="primary" id="btnDownload"></button>
+    </div>
+  </section>
+</div>
+
+<!-- 隐藏的相机源视频（提供逐帧回调用于时间戳与镜像绘制） -->
+<video id="camSrc" class="hidden-src" playsinline muted></video>
+
+<!-- 本地私密配置（含上传地址）；被 .gitignore 忽略。缺失也不影响页面，仅不自动上传。 -->
+<script src="config.js"></script>
+<script type="module">
+// 注意：人脸检测库（第三方）改为「进入摄像头页时才动态加载」，
+// 使登录 / PIS / 同意书等页面零第三方请求（符合伦理附录对同意/录制页的建议）。
+const MEDIAPIPE_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+/* --------------------------------------------------------------------- *
+ *  配置（与 record.py 对齐）
+ * --------------------------------------------------------------------- */
+const EMOTIONS = [
+  "anger","disgust","fear","happiness","sadness","surprise","wink",
+  "eye_movement","tongue_out","head_movement","asymmetric_surprise",
+  "asymmetric_smile","asymmetric_eyebrow_raise","laughter",
+];
+
+const EMOTION_HINT = {
+  zh: {
+    anger:"Anger 愤怒", disgust:"Disgust 厌恶", fear:"Fear 恐惧",
+    happiness:"Happiness 高兴", sadness:"Sadness 悲伤", surprise:"Surprise 惊讶",
+    wink:"Wink 眨单眼 (Single-eye blink)", eye_movement:"Eye Movement 眼球转动",
+    tongue_out:"Tongue Out 吐舌", head_movement:"Head Movement 转头",
+    asymmetric_surprise:"Asymmetric Surprise 不对称惊讶",
+    asymmetric_smile:"Asymmetric Smile 不对称微笑",
+    asymmetric_eyebrow_raise:"Asymmetric Eyebrow Raise 单侧扬眉",
+    laughter:"Laughter 大笑",
+  },
+  en: {
+    anger:"Anger", disgust:"Disgust", fear:"Fear", happiness:"Happiness",
+    sadness:"Sadness", surprise:"Surprise", wink:"Wink (single-eye blink)",
+    eye_movement:"Eye Movement", tongue_out:"Tongue Out", head_movement:"Head Movement",
+    asymmetric_surprise:"Asymmetric Surprise", asymmetric_smile:"Asymmetric Smile",
+    asymmetric_eyebrow_raise:"Asymmetric Eyebrow Raise", laughter:"Laughter",
+  },
+};
+
+const EMOTION_DESC = {
+  zh: {
+    anger:"请做出生气/愤怒的表情。", disgust:"请做出嫌恶/厌恶的表情。",
+    fear:"请做出害怕/恐惧的表情。", happiness:"请做出高兴的表情。",
+    sadness:"请做出伤心/悲伤的表情。", surprise:"请做出吃惊/惊讶的表情。",
+    wink:"只眨/闭合一只眼睛，另一只眼睛保持睁开（头部不动）。",
+    eye_movement:"保持头部不动，仅转动眼球（可选择看左、右、上、下）。",
+    tongue_out:"自然地把舌头伸出来。",
+    head_movement:"缓慢地转动头部（如向左右摇头或上下点头）。",
+    asymmetric_surprise:"请做出惊讶的表情，但同时保证你的表情是不对称的",
+    asymmetric_smile:"邪魅一笑",
+    asymmetric_eyebrow_raise:"只扬起一侧眉毛，另一侧保持不动。",
+    laughter:"自然地大笑（可以出声）。",
+  },
+  en: {
+    anger:"Please make an angry expression.", disgust:"Please make a disgusted expression.",
+    fear:"Please make a fearful expression.", happiness:"Please make a happy expression.",
+    sadness:"Please make a sad expression.", surprise:"Please make a surprised expression.",
+    wink:"Close/blink one eye only while keeping the other open (keep your head still).",
+    eye_movement:"Keep your head still and move only your eyes (you may look left, right, up, or down).",
+    tongue_out:"Stick your tongue out naturally.",
+    head_movement:"Slowly move your head (e.g. shake left-right or nod up-down).",
+    asymmetric_surprise:"Make a surprised expression, but keep it asymmetric (use one side only).",
+    asymmetric_smile:"Give a sly, one-sided smirk.",
+    asymmetric_eyebrow_raise:"Raise only one eyebrow; keep the other still.",
+    laughter:"Laugh naturally (you may make sound).",
+  },
+};
+
+const COUNTDOWN_SEC = 3;
+const OVAL = { cx:0.5, cy:0.46, rx:0.20, ry:0.30 };
+
+// 每段录完自动上传到 Google Drive 的 Apps Script Web App 地址。
+// 从同目录 config.js 读取（该文件被 .gitignore 忽略，不入库）。
+// 缺失或留空 => 只本地下载、不上传（页面照常可用）。部署方法见 gdrive_upload.gs。
+const UPLOAD_URL = (window.RECORDER_CONFIG && window.RECORDER_CONFIG.UPLOAD_URL) || "";
+
+const INSTRUCTION_TEXT = {
+  zh: `实验须知
+
+感谢您参与本次人脸表情录制实验。请在开始前仔细阅读以下内容：
+
+【实验目的】
+本实验采集您在做出不同面部表情/动作时的短视频，用于人脸视频相关的科研分析。
+
+★【最重要：每段录制的标准流程】★
+请务必对每一段录制都遵循以下「中性 → 目标表情 → 中性」的完整过程：
+1. 录制开始时，先保持【中性表情 Neutral】（面部放松、不带任何表情）约 1 秒。
+2. 然后自然地做出当前提示的【目标表情/动作】，并保持清晰、到位。
+3. 做完后，请【回到中性表情 Neutral】，面部重新放松。
+4. 确认已回到中性后，再按【空格键】停止录制。
+   —— 即每段视频都应是：中性起始 → 表情高峰 → 回到中性 这样一个完整过程。
+
+【实验流程】
+1. 系统会依次提示一个目标表情/动作（例如 Anger 愤怒）。
+2. 看到提示后，先以中性表情准备好。
+3. 按下【空格键】，系统进行 3 秒倒计时（屏幕显示），倒计时结束后开始录制。
+4. 按上面的「中性 → 目标 → 中性」标准流程完成，然后再次按【空格键】停止录制。
+5. 您可以回放刚才的视频，选择【保留并继续】或【重新录制】。
+6. 完成全部项目后实验结束，数据将保存在本地。
+
+【注意事项】
+- 请保持面部完整出现在屏幕中央的人脸轮廓范围内。
+- 请保证光线充足，正对摄像头；请勿用口罩、刘海、手等遮挡眉毛、眼睛和嘴巴。
+- 请将遮挡额头/眉毛的头发拨开，确保眉毛和眼睛清晰可见。
+- 如戴眼镜出现明显反光，建议摘下眼镜；请勿佩戴帽子、太阳镜等遮挡物。
+- 请把摄像头/设备放稳，录制时不要手持或触碰设备，避免画面晃动。
+- 请确保画面中只有您一人，背景内不要有其他人出现或走动。
+- 做表情时请勿用手触碰或辅助面部，双手不要进入画面。
+- 录制时嘴里请勿含食物、口香糖等物品。
+- 请避免强逆光/背光，光源尽量在正前方，避免半边脸明显阴影。
+- 每段录制时长建议 3~6 秒；动作自然、到位即可，不必夸张或僵硬。
+- 除非项目本身指定（如 Head movement 转头），否则请全程尽量保持头部不动、正对镜头。
+- 对于单侧/不对称类项目（如 Wink 眨单眼、Asymmetric 不对称系列），请尽量只活动
+  一侧，另一侧保持放松不动。
+- 倒计时结束、开始录制后再做目标表情；请勿在倒计时期间提前做。
+- 除非项目本身涉及发声（如 Laughter 大笑），录制时请尽量不要说话。
+- 录制本实验视频，即表示您自愿同意将您的肖像用于科研目的；我们将严格保护您的
+  隐私与数据安全，仅在科研范围内使用。
+- 如您在过程中感到任何不适，可随时停止；也可随时关闭窗口退出实验，
+  已保存的数据不受影响。
+- 如您日后希望删除自己的数据，可通过邮箱 j.wan@imperial.ac.uk 联系我们。
+
+如已阅读并理解以上内容，请勾选下方选项并点击“我已阅读，开始测试”。`,
+
+  en: `Instructions
+
+Thank you for taking part in this facial expression recording study. Please read
+the following carefully before you start.
+
+[Purpose]
+This study records short videos of you performing different facial expressions /
+movements, for facial-video research analysis.
+
+★ [MOST IMPORTANT: Standard procedure for every clip] ★
+For every recording, please follow this complete "Neutral -> Target -> Neutral":
+1. At the start, hold a NEUTRAL face (relaxed, no expression) for about 1 second.
+2. Then naturally perform the prompted TARGET expression/movement, clearly and fully.
+3. Afterwards, RETURN to a NEUTRAL face and relax again.
+4. Only after returning to neutral, press [SPACE] to stop recording.
+   -- i.e. each clip should be: neutral start -> expression peak -> back to neutral.
+
+[Procedure]
+1. The system prompts one target expression/movement at a time (e.g. Anger).
+2. When you see the prompt, get ready with a neutral face.
+3. Press [SPACE]; a 3-second on-screen countdown runs, then recording starts.
+4. Complete the "Neutral -> Target -> Neutral" process, then press [SPACE] to stop.
+5. You can replay the clip and choose [Keep & Next] or [Re-record].
+6. After all items are done, the study ends and the data is saved locally.
+
+[Notes]
+- Keep your whole face inside the face outline at the center of the screen.
+- Ensure good lighting and face the camera; do not block your eyebrows, eyes or
+  mouth with a mask, hair, hands, etc.
+- Push aside any hair covering your forehead/eyebrows so they are clearly visible.
+- If your glasses cause noticeable glare, please take them off; do not wear hats,
+  sunglasses or other coverings.
+- Place the camera/device on a stable surface; do not hold or touch it while
+  recording, to avoid shaking.
+- Make sure you are the only person in the frame, with no one else appearing or
+  moving in the background.
+- Do not touch or assist your face with your hands, and keep your hands out of frame.
+- Do not keep food, gum or other items in your mouth during recording.
+- Avoid strong backlighting; keep the light source in front of you and avoid heavy
+  shadows on one side of the face.
+- Each clip should last about 3-6 seconds; keep movements natural and clear,
+  neither exaggerated nor stiff.
+- Unless an item specifies otherwise (e.g. Head movement), keep your head as still
+  as possible and facing the camera throughout.
+- For one-sided / asymmetric items (e.g. Wink, the Asymmetric series), move only
+  one side and keep the other side relaxed and still.
+- Perform the target expression only after the countdown ends and recording has
+  started; do not start early during the countdown.
+- Unless the item involves sound (e.g. Laughter), please try not to speak.
+- By recording videos in this study, you voluntarily consent to the use of your
+  likeness for research purposes; we will strictly protect your privacy and data
+  security and use them only for research.
+- If you feel any discomfort, you may stop at any time; you may also close the
+  window to quit at any time, and already-saved data is not affected.
+- If you later wish to delete your data, contact us at j.wan@imperial.ac.uk.
+
+Once you have read and understood the above, tick the box below and click
+"I have read it, start the test".`,
+};
+
+const TR = {
+  zh: {
+    login_title:"受试者信息登录", field_name:"姓名 Name", field_age:"年龄 Age",
+    field_gender:"性别 Gender", field_nationality:"国籍 Nationality", submit:"提交 / Submit",
+    warn_name:"请填写姓名 Name", warn_age:"请填写有效年龄 Age",
+    instr_header:"实验须知 / Instructions", read_check:"我已阅读并理解以上须知",
+    read_button:"我已阅读，开始测试", need_read:"请先勾选“我已阅读并理解以上须知”",
+    cam_fail:"无法打开摄像头，请检查设备并允许浏览器访问摄像头与麦克风。",
+    camtest_header:"摄像头测试 / Camera Check",
+    camtest_sub:"请调整位置，使面部完整落入轮廓内（轮廓变绿即可）。",
+    detecting:"检测中...", face_ok:"人脸位置合适 ✓", move_in:"请将面部移入轮廓内...",
+    pose_up:"请不要仰头，平视镜头", pose_down:"请不要低头，平视镜头",
+    pose_turn:"请正对镜头，不要左右转头", pose_tilt:"请摆正头部，不要歪头",
+    manual_ok:"未加载人脸检测，请自行对齐后开始",
+    start_record:"开始录制 / Start Recording",
+    progress:"进度 {i} / {n}    受试者: {sid}", target:"目标项目：{name}",
+    hint_idle:"按【空格键】开始 3 秒倒计时并录制；再次按【空格键】停止。",
+    hint_recording:"录制中... 再次按【空格键】停止。",
+    hint_review:"请回放确认；可重录，或保留并进入下一个项目。",
+    rec_badge:"● 录制中 REC", done:"录制完成（{n} 帧 / {fps} fps），请回放确认",
+    no_frames:"未捕获到画面，请重试。",
+    replay:"▶ 回放 / Replay", redo:"↺ 重新录制 / Re-record", keep_next:"✓ 保留并继续 / Keep & Next",
+    finish_title:"录制完成，感谢您的参与！",
+    finish_uploading_title:"正在上传，请勿关闭此页面…",
+    finish_saved:"点击下方按钮下载数据压缩包（包含所有视频、逐帧时间戳与元数据）。",
+    download:"下载数据 (.zip)",
+    welcome_title:"欢迎使用人脸表情录制系统",
+    welcome_intro:"本次共分两个部分，预计约 10–15 分钟，请依次完成：",
+    welcome_part1:"第一部分 · 知情同意：先阅读参与者须知，再逐项完成同意书并签名。",
+    welcome_part2:"第二部分 · 数据收集：填写基本信息后，按屏幕提示逐个做出面部表情并录制短视频。",
+    welcome_start:"开始 / Start",
+    part1_label:"第一部分 / Part 1 of 2 · 知情同意 Consent",
+    part2_label:"第二部分 / Part 2 of 2 · 数据收集 Data collection",
+    cd_title:"知情同意已完成 ✓",
+    cd_msg:"感谢您的同意。现在进入【第二部分 · 数据收集】。接下来请填写少量基本信息，然后按提示逐个做出面部表情并录制短视频。",
+    cd_continue:"开始数据收集 / Start data collection",
+    up_ok:"已上传", up_fail:"失败", up_pending:"待传",
+    uploading:"正在上传到云端 Drive，请稍候…",
+    upload_done:"全部数据已上传到云端 ✓",
+    upload_partial:"已上传 {ok} 项，{fail} 项失败——请点下方按钮下载 zip 并把失败部分补发给研究者。",
+    all_done_close:"现在已经全部完成，可以直接关闭本页面了。感谢您的参与！",
+    download_backup:"下载本地备份（可选）",
+  },
+  en: {
+    login_title:"Subject Information", field_name:"Name", field_age:"Age",
+    field_gender:"Gender", field_nationality:"Nationality", submit:"Submit",
+    warn_name:"Please enter your name.", warn_age:"Please enter a valid age.",
+    instr_header:"Instructions", read_check:"I have read and understood the instructions above.",
+    read_button:"I have read it, start the test",
+    need_read:"Please tick “I have read and understood the instructions above.” first.",
+    cam_fail:"Cannot open the camera. Please check your device and allow camera and microphone access.",
+    camtest_header:"Camera Check",
+    camtest_sub:"Adjust your position so your face fully fits the outline (it turns green).",
+    detecting:"Detecting...", face_ok:"Face position OK ✓", move_in:"Please move your face into the outline...",
+    pose_up:"Please don't tilt your head up — look straight at the camera.",
+    pose_down:"Please don't tilt your head down — look straight at the camera.",
+    pose_turn:"Please face the camera directly — don't turn left or right.",
+    pose_tilt:"Please keep your head level — don't tilt it.",
+    manual_ok:"Face detection unavailable — align yourself, then start",
+    start_record:"Start Recording",
+    progress:"Item {i} / {n}    Subject: {sid}", target:"Target: {name}",
+    hint_idle:"Press [SPACE] to start a 3s countdown and record; press [SPACE] again to stop.",
+    hint_recording:"Recording... press [SPACE] again to stop.",
+    hint_review:"Please review; re-record, or keep and go to the next item.",
+    rec_badge:"● REC", done:"Done ({n} frames / {fps} fps). Please review.",
+    no_frames:"No frames captured. Please try again.",
+    replay:"▶ Replay", redo:"↺ Re-record", keep_next:"✓ Keep & Next",
+    finish_title:"All done. Thank you for your participation!",
+    finish_uploading_title:"Uploading… please do not close this page.",
+    finish_saved:"Click below to download the data archive (all videos, per-frame timestamps and metadata).",
+    download:"Download data (.zip)",
+    welcome_title:"Welcome to the Facial Expression Recording System",
+    welcome_intro:"This session has two parts and takes about 10–15 minutes. Please complete them in order:",
+    welcome_part1:"Part 1 · Informed consent: read the Participant Information Sheet, then complete and sign the consent form item by item.",
+    welcome_part2:"Part 2 · Data collection: enter basic details, then follow the on-screen prompts to perform facial expressions and record short clips.",
+    welcome_start:"Start",
+    part1_label:"Part 1 of 2 · Informed consent",
+    part2_label:"Part 2 of 2 · Data collection",
+    cd_title:"Consent completed ✓",
+    cd_msg:"Thank you. We will now begin Part 2 · Data collection. Next, please enter a few basic details, then record short facial-expression clips as prompted.",
+    cd_continue:"Start data collection",
+    up_ok:"uploaded", up_fail:"failed", up_pending:"pending",
+    uploading:"Uploading to cloud Drive, please wait…",
+    upload_done:"All data uploaded to the cloud ✓",
+    upload_partial:"Uploaded {ok} item(s), {fail} failed — please download the zip below and send the failed part to the researcher.",
+    all_done_close:"Everything is now complete. You may close this page. Thank you for taking part!",
+    download_backup:"Download a local backup (optional)",
+  },
+};
+
+/* --------------------------------------------------------------------- *
+ *  知情同意（PIS + Consent）—— 条文为伦理批准版英文原文，请勿改动措辞。
+ *  版本号、生物识别声明由研究者维护；PIS 正文请粘贴到 config.js 或下面的
+ *  PIS_TEXT 占位处。
+ * --------------------------------------------------------------------- */
+const CONSENT_FORM_VERSION = "0.1";   // 与展示给参与者的批准版一致（务必核对）
+const PIS_VERSION = "0.1";            // 批准的 Participant Information Sheet 版本号
+
+// 参与者须知全文（本研究专属草稿，依 Imperial 非健康研究 PIS 指南撰写）。
+// [TODO ...] 标注的是只有研究者能确认的事实（保留年限、经费、伦理审查、结束日期、
+// 参与人数等），提交伦理前请务必填实并核对。config.js 的 PIS_TEXT 可覆盖此默认值。
+const PIS_TEXT_EN =
+`Participant Information Sheet
+
+Study title: Facial Expression Video Data Collection for Human Behaviour Understanding, Modelling and Generation
+
+Principal Investigator: Jingyi Wan, Department of Computing, Imperial College London
+Research group: Intelligent Behavior Understanding Group, Department of Computing, Imperial College London
+Contact: j.wan@imperial.ac.uk
+Co-investigators / collaborators: None
+
+You are being invited to take part in a research study. Before you decide it is important for you to understand why the research is being done and what it will involve. Please take time to read the following information carefully and discuss it with others if you wish. Ask us if there is anything that is not clear or if you would like more information. Take time to decide whether or not you wish to take part. Thank you for reading this.
+
+Do I have to take part?
+It is up to you to decide whether or not to take part. If you do decide to take part you will be given this information sheet to keep and be asked to sign a consent form. If you decide to take part you are still free to withdraw at any time and without giving a reason. If you withdraw, we will stop collecting new information from you; recordings and information we have already collected, any analyses already carried out, and any data or outputs already shared or published with your permission, may be kept (see "What are your choices about how your information is used?" below).
+
+What is the purpose of the study?
+This study collects short video recordings of people performing a set of prompted facial expressions and movements (for example anger, happiness, surprise, eye movement, head movement). We use these recordings, and numerical features derived from them, to develop, train, validate, evaluate and compare computational and artificial-intelligence models for human behaviour understanding, facial-expression modelling, and facial-video generation, reconstruction, animation and editing. This study is being conducted as a student research project as part of the researcher's postgraduate studies in the Department of Computing, Imperial College London.
+
+Why have I been invited?
+You have been invited because you are aged 18 years or over and are able to perform a short set of facial expressions in front of a webcam. We expect approximately 50 participants to take part.
+
+What will happen to me if I take part?
+- Taking part involves a single session lasting about 10-15 minutes; there is only one session and no follow-up visits.
+- You will read this information sheet and complete an electronic consent form. You will then be guided, through your web browser, to record a series of short clips (each a few seconds long) in which you perform prompted facial expressions and movements - about 14 items in total.
+- The recordings are made using your device's webcam and microphone, and capture video of your face together with audio. Audio is recorded so that expressions involving sound (for example laughter) can be captured and analysed, subject to the consents you give on the consent form.
+- Your recordings are transmitted over an encrypted connection (HTTPS) and stored in secure, access-controlled cloud storage (Google Drive) managed by the research team. Processing and storage may take place on servers located outside the United Kingdom (see "International transfers" below). Your files are labelled with a participant code, not your name.
+- We do not offer payment or travel expenses for taking part.
+
+What do I have to do?
+There are no lifestyle or dietary restrictions. You only need reasonable lighting and to follow the on-screen prompts. You may pause or stop at any time, and you may close the window to end the session; data already saved is not affected.
+
+What are the possible disadvantages and risks of taking part?
+The risks are minimal. You may feel mild fatigue or self-consciousness while performing expressions. Because we record video of your face, you may be recognisable in the original recordings even though your name is removed. We reduce privacy risks by using a participant code instead of your name, storing data securely with access controls, and only including identifiable images or video in public outputs if you separately agree to this on the consent form.
+
+What are the possible benefits of taking part?
+We cannot promise the study will help you, but the information we get might help advance research into human behaviour understanding and facial-video technologies.
+
+What if something goes wrong?
+If you are harmed by taking part in this research project, there are no special compensation arrangements. If you are harmed due to someone's negligence, then you may have grounds for a legal action. Regardless of this, if you wish to complain, or have any concerns about any aspect of the way you have been treated during the course of this study, then you should immediately inform the Investigator (Jingyi Wan, j.wan@imperial.ac.uk). If you are still not satisfied with the response, you may contact the Imperial College Research Governance and Integrity Team (rgitcoordinator@imperial.ac.uk).
+
+What will happen to the results of the research study?
+The results may be published in academic journals, conference papers and related scientific outputs. Statistical results, aggregate findings and model-performance results that do not directly identify you may be published. Identifiable images or video of you will only be published or publicly displayed if you separately agree to this on the consent form. You will not be identified by name in any report or publication. A copy of published results can be obtained by contacting the research team. There is currently no confirmed timeframe for publication.
+
+Who is organising and funding the research?
+The study is organised by the Intelligent Behavior Understanding Group, Department of Computing, Imperial College London. The study is self-funded by the research team and has not received any external funding.
+
+` +
+// —— 伦理审查机构（暂缺，待伦理批准后填写）——
+// 拿到伦理批准后：删掉这段注释，并把下面这一节移回上方英文正文，把 [TODO ...] 换成真实审查机构名称：
+//   Who has reviewed the study?
+//   [TODO: name the reviewing body, e.g. "This study was given a favourable opinion by the Science, Engineering and Technology Research Ethics Committee (SETREC)" and/or approval by the Head of Department and the Research Governance and Integrity Team (RGIT).]
+`Contact for further information
+For further information, or if you have any questions, please contact Jingyi Wan (j.wan@imperial.ac.uk).
+
+Thank you for reading this information sheet. A copy of this written information and your signed consent form will be given to you to keep.
+
+-------------------------------------------------------------------
+HOW WILL WE USE INFORMATION ABOUT YOU? (Transparency notice)
+
+Imperial College London is the sponsor for this study and acts as the data Controller. This means we are responsible for looking after your information and using it appropriately. Imperial College London will keep your personal data for:
+  - 10 years after the study has finished in relation to consent forms; and
+  - 10 years after the study has completed in relation to primary research data.
+The study is expected to finish in July 2027. For confirmation of the end date please contact the study team (see "Where can you find out more" below).
+
+We will use information from you for this research project. This information will include your name and contact details (used only to administer your consent), the demographic details you provide (age, gender, nationality), your facial video recordings, and numerical data derived from them (such as facial landmarks, facial movements, action units and embeddings). People who do not need to know who you are will not see your name or contact details; your data will have a participant code instead.
+
+We will keep your information safe and secure by, for example: applying a participant code (pseudonymisation) so recordings are not stored under your name; transmitting data over encrypted connections (HTTPS); storing data in access-controlled cloud storage managed by the research team; and limiting access to key study personnel.
+
+Legal basis: As a university we use personal information to conduct research in the public interest and/or in our legitimate interests of conducting world-leading research. Our legal basis under the UK GDPR and the Data Protection Act 2018 is "performance of a task carried out in the public interest" or "legitimate interests". Facial images and related biometric data are special category data; for these we rely on the "scientific or historical research purposes or statistical purposes" condition. We conduct scientific research in compliance with the law and guidance published by the UK Information Commissioner's Office (ICO).
+
+International transfers: Your data may be processed or stored outside the United Kingdom (for example because our cloud storage provider or research collaborators are located abroad). Where this happens we only share what is needed and rely on appropriate safeguards (such as an adequacy decision or standard contractual terms) so that your data has a similar level of protection as it does under UK law.
+
+Sharing your information with others: We will only share your personal data with certain third parties for the purposes described in this sheet. This may include other Imperial College London staff involved in or supporting the study, our service providers (such as the cloud storage provider) under data-processing agreements, and - only if you consent on the consent form - verified academic researchers or approved collaborators under controlled access and data-sharing agreements. There are no specific collaborators or partners at present.
+
+Potential use of study data for future research: With your consent, information collected in this study may be provided to researchers running other ethically approved research studies, at this or other organisations, in this country or abroad. Such information will be used only to conduct research in accordance with relevant legislation (the UK GDPR and the Data Protection Act 2018) and will not be used to make decisions about you.
+
+Commercialisation: Aggregated or anonymised data sets may also be used for future research or commercial purposes such as developing new products or services. Your name and identifying details will not be given to third parties; you would be identified only by a participant code. Your data will not be shared with a commercial organisation for marketing purposes.
+
+What are your choices about how your information is used?
+You can stop being part of the study at any time, without giving a reason, but we will keep information about you that we already have. You have the right to ask us to remove, change or delete data we hold about you for the study; we might not always be able to do this if it means we cannot carry out the research, and if so we will tell you why.
+
+Where can you find out more about how your information is used?
+You can find out more by asking a member of the research team, by email (j.wan@imperial.ac.uk).
+
+Complaint: If you wish to raise a complaint about how we have handled your personal data, please contact the research team first (j.wan@imperial.ac.uk). Following our response, if you are not satisfied please contact Imperial College London's Data Protection Officer by email at dpo@imperial.ac.uk, by telephone on 020 7594 3502, or by post at Imperial College London, Data Protection Officer, Faculty Building Level 4, London SW7 2AZ. If you remain unsatisfied, you can complain to the Information Commissioner's Office (ICO) via www.ico.org.uk.
+
+-------------------------------------------------------------------
+Participant Information Sheet - Version 0.1 - 20 July 2026`;
+
+// 中文参考翻译（以英文版为准；[TODO ...] 处同样需研究者填实）
+const PIS_TEXT_ZH =
+`参与者须知
+
+（本中文为便利参考翻译；如与英文版有出入，以英文版为准。）
+
+研究标题：面向人类行为理解、建模与生成的面部表情视频数据采集
+（Facial Expression Video Data Collection for Human Behaviour Understanding, Modelling and Generation）
+
+首席研究员（PI）：Jingyi Wan，帝国理工学院计算系
+研究组：Intelligent Behavior Understanding Group，帝国理工学院计算系
+联系方式：j.wan@imperial.ac.uk
+共同研究者 / 合作者：无（None）
+
+我们诚邀您参加一项研究。在您决定之前，请务必了解本研究的目的与内容。请花时间仔细阅读以下信息，如愿意也可与他人商量。如有任何不清楚之处或想了解更多，请向我们咨询。请从容决定是否参加。感谢您的阅读。
+
+我必须参加吗？
+是否参加完全由您决定。若您决定参加，我们会把本须知交给您留存，并请您签署一份同意书。即使决定参加，您仍可随时退出，且无需说明理由。若您退出，我们将停止向您采集新的信息；我们已采集的录像与信息、已进行的分析，以及经您许可已共享或已发表的数据或成果，可能会被保留（见下文"关于您的信息如何被使用，您有哪些选择？"）。
+
+本研究的目的是什么？
+本研究采集人们做出一组提示性面部表情与动作（例如愤怒、高兴、惊讶、眼球转动、转头）的短视频。我们利用这些录像及从中提取的数值特征，来开发、训练、验证、评估和比较用于人类行为理解、面部表情建模，以及面部视频生成、重建、动画与编辑的计算与人工智能模型。本研究属于学生研究项目，作为研究者在帝国理工学院计算系研究生学业的一部分开展。
+
+我为何被邀请？
+您被邀请是因为您已年满 18 周岁，且能够在摄像头前做出一组简短的面部表情。我们预计约有 50 名参与者参加。
+
+如果我参加，会发生什么？
+- 参加仅涉及一次时长约 10–15 分钟的会话；仅一次，无后续随访。
+- 您将阅读本须知并完成一份电子同意书，随后系统会通过您的网页浏览器引导您录制一系列短片段（每段几秒），做出提示的面部表情与动作——共约 14 项。
+- 录制使用您设备的摄像头与麦克风，采集您面部的视频及同期音频。录制音频是为了捕捉并分析涉及声音的表情（例如大笑），并以您在同意书中给予的同意为准。
+- 您的录像通过加密连接（HTTPS）传输，并存储在由研究团队管理的、受访问控制的安全云存储（Google Drive）中。处理与存储可能发生在英国境外的服务器上（见下文"国际传输"）。您的文件以参与者编号而非姓名标识。
+- 参加不提供报酬或交通补贴。
+
+我需要做什么？
+没有任何生活方式或饮食限制。您只需光线适中并按屏幕提示操作。您可随时暂停或停止，也可关闭窗口结束会话；已保存的数据不受影响。
+
+参加可能有哪些不利与风险？
+风险很小。做表情时您可能感到轻微疲劳或不自在。由于我们录制您的面部视频，即使去除姓名，您在原始录像中仍可能被识别。我们通过以下方式降低隐私风险：以参与者编号代替姓名、以访问控制安全存储数据，且仅在您于同意书中另行同意时，才将可识别的图像或视频用于公开输出。
+
+参加可能有哪些益处？
+我们不能保证本研究会对您有帮助，但我们所获得的信息可能有助于推进人类行为理解与面部视频技术方面的研究。
+
+如果出了问题怎么办？
+如果您因参加本研究项目而受到伤害，本研究没有专门的赔偿安排。如果您因他人过失而受到伤害，您可能有依法起诉的理由。无论如何，若您希望投诉，或对本研究过程中您受到对待的任何方面有任何顾虑，应立即告知研究者（Jingyi Wan，j.wan@imperial.ac.uk）。若您仍不满意，可联系帝国理工学院研究治理与诚信团队（Research Governance and Integrity Team，rgitcoordinator@imperial.ac.uk）。
+
+研究结果会怎样处理？
+研究结果可能在学术期刊、会议论文及相关科学产出中发表。不直接识别您身份的统计结果、汇总发现与模型性能结果可能会被发表。可识别您的图像或视频，仅在您于同意书中另行同意时才会发表或公开展示。您不会在任何报告或出版物中被具名识别。可通过联系研究团队获取已发表结果的副本。目前尚无确定的发表时间。
+
+谁在组织并资助本研究？
+本研究由帝国理工学院计算系 Intelligent Behavior Understanding Group 组织。本研究由研究团队自筹经费，未获得任何外部资助。
+
+` +
+// —— 伦理审查机构（暂缺，待伦理批准后填写）——
+// 拿到伦理批准后：删掉这段注释，并把下面这一节移回上方中文正文，把 [TODO ...] 换成真实审查机构名称：
+//   谁审查了本研究？
+//   [TODO：写明审查机构，例如"本研究已获科学、工程与技术研究伦理委员会（SETREC）的赞成意见"，和/或经系主任及研究治理与诚信团队（RGIT）批准。]
+`进一步信息联系方式
+如需进一步信息或有任何疑问，请联系 Jingyi Wan（j.wan@imperial.ac.uk）。
+
+感谢您阅读本须知。本书面信息及您签署的同意书将交给您一份留存。
+
+-------------------------------------------------------------------
+我们将如何使用您的信息？（透明度声明）
+
+帝国理工学院是本研究的发起方，并作为数据控制者（Controller）。这意味着我们负责妥善保管并适当使用您的信息。帝国理工学院将保留您的个人数据：
+  - 同意书：研究结束后 10 年；
+  - 原始研究数据：研究完成后 10 年。
+本研究预计于 2027 年 7 月 结束。如需确认结束日期，请联系研究团队（见下文"您可在何处进一步了解"）。
+
+我们将为本研究项目使用来自您的信息。这些信息包括：您的姓名与联系方式（仅用于办理您的同意）、您提供的人口学信息（年龄、性别、国籍）、您的面部视频录像，以及由其衍生的数值数据（如面部关键点、面部运动、动作单元与嵌入）。无需知道您身份的人将无法看到您的姓名或联系方式；您的数据将以参与者编号代替。
+
+我们将通过例如以下方式确保您的信息安全：使用参与者编号（假名化），使录像不以您的姓名存储；通过加密连接（HTTPS）传输数据；将数据存储在由研究团队管理、受访问控制的云存储中；并将访问限于关键研究人员。
+
+合法性依据：作为一所大学，我们出于公共利益，和/或出于我们开展世界领先研究的正当利益，使用个人信息。在《英国通用数据保护条例》（UK GDPR）与《2018 年数据保护法》下，我们的合法性依据为"为公共利益执行的任务"或"正当利益"。面部图像及相关生物特征数据属于特殊类别数据；对此我们依据"科学或历史研究目的或统计目的"条件。我们依法并遵循英国信息专员办公室（ICO）发布的指南开展科学研究。
+
+国际传输：您的数据可能在英国境外被处理或存储（例如因我们的云存储提供商或研究合作者位于境外）。发生此情况时，我们仅共享必要的数据，并依赖适当的保障措施（如充分性决定或标准合同条款），使您的数据获得与英国法律下相似的保护水平。
+
+与他人共享您的信息：我们仅出于本须知所述目的，与特定第三方共享您的个人数据。这可能包括：参与或支持本研究的其他帝国理工学院人员；在数据处理协议下的服务提供商（如云存储提供商）；以及——仅在您于同意书中同意时——在受控访问与数据共享协议下的经核实学术研究者或经批准的合作者。目前没有具体的合作者或伙伴。
+
+研究数据用于未来研究的可能：经您同意，本研究采集的信息可提供给在本机构或其他机构（本国或境外）开展其他经伦理批准研究的研究者。这些信息仅用于依照相关法规（UK GDPR 与《2018 年数据保护法》）开展研究，且不会被用于对您作出决定。
+
+商业化：汇总或匿名化的数据集也可能用于未来研究或商业目的，例如开发新产品或服务。您的姓名与身份识别信息不会提供给第三方；您仅以参与者编号被标识。您的数据不会为营销目的与商业机构共享。
+
+关于您的信息如何被使用，您有哪些选择？
+您可随时退出本研究而无需说明理由，但我们会保留我们已经掌握的关于您的信息。您有权要求我们移除、更改或删除我们为本研究持有的关于您的数据；如果这样做会导致我们无法开展研究，我们可能无法总是照办，若如此我们会告知您原因。
+
+您可在何处进一步了解您的信息如何被使用？
+您可通过询问研究团队成员、发送邮件（j.wan@imperial.ac.uk）了解更多。
+
+投诉：如您希望就我们处理您个人数据的方式提出投诉，请先联系研究团队（j.wan@imperial.ac.uk）。在我们答复后，如您不满意，请联系帝国理工学院数据保护官（Data Protection Officer）：邮箱 dpo@imperial.ac.uk，电话 020 7594 3502，或邮寄至 Imperial College London, Data Protection Officer, Faculty Building Level 4, London SW7 2AZ。如您仍不满意，可通过 www.ico.org.uk 向英国信息专员办公室（ICO）投诉。
+
+-------------------------------------------------------------------
+参与者须知 — 版本 0.1 — 2026 年 7 月 20 日`;
+
+// 按指定语言取 PIS 正文；config.js 的 PIS_TEXT 可覆盖（字符串=两语通用；{en,zh}=分语言）
+function pisTextForLang(lang) {
+  const cfg = window.RECORDER_CONFIG && window.RECORDER_CONFIG.PIS_TEXT;
+  if (cfg && typeof cfg === "object") return cfg[lang] || cfg.en || cfg.zh || "";
+  if (typeof cfg === "string" && cfg) return cfg;
+  return lang === "zh" ? PIS_TEXT_ZH : PIS_TEXT_EN;
+}
+function pisText() { return pisTextForLang(S.lang); }
+
+/* 将纯文本 PIS 渲染为带层级的 HTML：问句/短句 -> 小节标题，"- " -> 要点列表，
+ * 顶部"标签: 值"行 -> 元信息卡片，[TODO ...] -> 红色高亮。PIS 原文字符串保持不变。
+ * 注意：与下方渲染 PIS 屏幕的 renderPis() 不同名，勿混淆。 */
+function formatPisDoc(el, text) {
+  const escT = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const mark = (s) => escT(s).replace(/\[TODO[^\]]*\]|TODO[:：][^\]\n]*\]?/g,
+                                      (m) => `<span class="pis-todo">${m}</span>`);
+  const out = [];
+  let list = null, meta = null, para = [];
+  const closePara = () => { if (para.length) { out.push(`<p>${para.join(" ")}</p>`); para = []; } };
+  const closeList = () => { if (list) { out.push(`<ul>${list.join("")}</ul>`); list = null; } };
+  const closeMeta = () => { if (meta) { out.push(`<div class="pis-meta">${meta.join("")}</div>`); meta = null; } };
+  const closeAll = () => { closePara(); closeList(); closeMeta(); };
+  let first = true;
+  for (const raw of text.split("\n")) {
+    const l = raw.trim();
+    if (!l) { closeAll(); continue; }
+    if (first) { first = false;
+      // 页面本身已有 "Participant Information Sheet" 大标题，跳过正文中重复的首行
+      if (/^(participant information sheet|参与者须知)$/i.test(l)) continue; }
+    if (/^-{5,}$/.test(l)) { closeAll(); out.push("<hr>"); continue; }          // 分隔线
+    if (/^-\s+/.test(l)) {                                                       // 要点列表
+      closePara(); closeMeta();
+      if (!list) list = [];
+      list.push(`<li>${mark(l.replace(/^-\s+/, ""))}</li>`); continue;
+    }
+    closeList();
+    if (/version\s|版本/i.test(l) && /participant information sheet|参与者须知/i.test(l)) {
+      closeAll(); out.push(`<p class="pis-version">${mark(l)}</p>`); continue;   // 版本页脚
+    }
+    const noColon = !/[:：]/.test(l);
+    if ((l.length <= 80 && /[?？]/.test(l) && !/[.。]$/.test(l)) ||               // 问句标题
+        (l.length <= 40 && noColon && !/[.。;；,，)）\]"”]$/.test(l) && !/^[（(]/.test(l))) { // 短标题
+      closeAll(); out.push(`<h3>${mark(l)}</h3>`); continue;
+    }
+    if (meta && /^[（(]/.test(l)) { meta.push(`<div class="pis-meta-sub">${mark(l)}</div>`); continue; }
+    const ci = l.search(/[:：]/);
+    if (ci > 0 && ci < 50 && !/[\[。]|\.\s/.test(l.slice(0, ci))) {
+      const val = l.slice(ci + 1).trim();
+      if (l.length < 160 && !/。|\.\s|\.$/.test(val)) {                           // 元信息行（标签: 值，值不含整句）
+        closePara();
+        if (!meta) meta = [];
+        meta.push(`<div><b>${mark(l.slice(0, ci + 1))}</b> ${mark(val)}</div>`); continue;
+      }
+      closeMeta(); closePara();                                                  // 带标签的段落（正文含整句）
+      out.push(`<p><span class="pis-label">${mark(l.slice(0, ci + 1))}</span> ${mark(val)}</p>`); continue;
+    }
+    closeMeta();
+    para.push(mark(l));
+  }
+  closeAll();
+  el.classList.add("pis-doc");
+  el.innerHTML = out.join("");
+}
+
+// 双语工具：按当前语言取文本，缺失回退英文。英文为准（authoritative）。
+const L = (o) => (o && (o[S.lang] != null ? o[S.lang] : o.en)) || "";
+// 中文显示时的提示：以英文为准（中文为参考翻译）。
+const CONSENT_LANG_NOTE = {
+  zh: "本同意书以英文版为准，中文为便利参考翻译。The English version is authoritative; the Chinese text is a reference translation.",
+  en: "",
+};
+
+// Section E：由研究者预先设定，参与者不选（附录要求）。本研究为「只分析、不识别」。
+const BIOMETRIC_STATEMENT = {
+  en: "This study analyses facial expression, behaviour or movement and will not use the recordings to recognise, identify or verify who the participant is.",
+  zh: "本研究分析面部表情、行为或运动，不会利用录像来辨认、识别或验证参与者的身份。",
+};
+
+const RESEARCH_CONTACT =
+  "Jingyi Wan, Department of Computing, Imperial College London\n" +
+  "Email: j.wan@imperial.ac.uk";
+
+// 各节标题（双语）
+const CONSENT_TITLES = {
+  A: { en: "A. Required consent to participate and core research use (Level 1 — required)", zh: "A. 参与及核心研究使用的必选同意（Level 1 — 必选）" },
+  A_intro: { en: "All items below are required to take part. Please tick each one.", zh: "以下各项均为参加本研究所必需，请逐项勾选。" },
+  B: { en: "B. Optional future research and controlled access (additional — not one of the Level 1/2/3 tiers)", zh: "B. 可选的未来研究与受控访问（附加项 — 不属于 Level 1/2/3 分级）" },
+  C: { en: "C. Written informed consent for publication and public display (Level 2 — optional)", zh: "C. 出版与公开展示的书面知情同意（Level 2 — 可选）" },
+  C_level2: { en: "How we may select your approved materials", zh: "如何选用您已批准的材料" },
+  C_free: { en: 'Additional restrictions on Level 2 use (optional). Examples: "still images only", "conference presentations only", "no press materials", "contact me before first publication".',
+            zh: '对 Level 2 使用的附加限制（可选）。例如："仅静态图像"、"仅会议展示"、"不用于新闻材料"、"首次发布前联系我"。' },
+  D: { en: "D. Sharing video data with other researchers (Level 3 — optional)", zh: "D. 与其他研究人员共享视频数据（Level 3 — 可选）" },
+  E: { en: "E. Facial identification and biometric processing (set by the research team)", zh: "E. 面部识别与生物特征处理（由研究团队设定）" },
+  H: { en: "H. Participant declaration", zh: "H. 参与者声明" },
+  review: { en: "Review & Sign", zh: "复核与签名" },
+  sign: { en: "Electronic signature", zh: "电子签名" },
+};
+
+// Section A —— 必选（Level 1）。全部勾选方可继续。
+const CONSENT_A = [
+  { en: "I confirm that I am aged 18 years or over and have capacity to provide informed consent.",
+    zh: "我确认我已年满 18 周岁，并有能力提供知情同意。" },
+  { en: "I confirm that I have read and understood the Participant Information Sheet identified above.",
+    zh: "我确认我已阅读并理解上述参与者须知（PIS）。" },
+  { en: "I have had enough time to consider the information, ask questions and receive satisfactory answers.",
+    zh: "我有充分的时间考虑相关信息、提出问题并获得满意的答复。" },
+  { en: "I understand that participation is voluntary and that I may stop taking part without giving a reason and without penalty or disadvantage.",
+    zh: "我理解参与是自愿的，我可以随时退出而无需说明理由，且不会受到任何处罚或不利影响。" },
+  { en: "I understand that the session involves recording video of my face while I perform specified expressions, movements or experimental tasks.",
+    zh: "我理解本次实验将录制我做出指定表情、动作或实验任务时的面部视频。" },
+  { en: "I understand that the recordings may reveal my appearance, approximate age, facial behaviour, voice where audio is recorded, and incidental information about my surroundings.",
+    zh: "我理解这些录像可能会显示我的外貌、大致年龄、面部行为、（在录音时的）声音，以及周围环境的附带信息。" },
+  { en: "I understand the foreseeable risks and discomforts described in the Participant Information Sheet.",
+    zh: "我理解参与者须知中所描述的可预见风险与不适。" },
+  { en: "I understand who will have access to my data, how it will be stored and protected, where it may be processed, and how long it will be retained.",
+    zh: "我理解谁将有权访问我的数据、数据将如何存储与保护、可能在何处处理，以及保留多长时间。" },
+  { en: "I understand that authorised Imperial College London personnel, research governance staff or regulators may inspect relevant study records where necessary and subject to confidentiality obligations.",
+    zh: "我理解经授权的帝国理工学院人员、研究治理人员或监管机构，可在必要时并在保密义务约束下查阅相关研究记录。" },
+  { en: "I agree to take part in this study.",
+    zh: "我同意参加本研究。" },
+  { en: "I agree that authorised members of the research team may view, annotate and analyse my video recordings for this study.",
+    zh: "我同意研究团队中经授权的成员为本研究查看、标注和分析我的视频录像。" },
+  { en: "I agree that my recordings may be processed to extract research information such as facial landmarks, facial movements, expression labels, action units, embeddings or other numerical features.",
+    zh: "我同意对我的录像进行处理，以提取诸如面部关键点、面部运动、表情标签、动作单元、嵌入或其他数值特征等研究信息。" },
+  { en: "I agree that my recordings and derived data may be used to develop, train, fine-tune, validate, evaluate or compare computational and artificial-intelligence models for human behaviour understanding, facial-expression modelling, video generation, reconstruction, animation, editing and related approved research purposes.",
+    zh: "我同意我的录像及衍生数据被用于开发、训练、微调、验证、评估或比较用于人类行为理解、面部表情建模、视频生成、重建、动画、编辑及相关经批准研究目的的计算与人工智能模型。" },
+  { en: "I understand that statistical results, aggregate findings, model-performance results and other outputs that do not directly identify me may be published.",
+    zh: "我理解不直接识别我身份的统计结果、汇总发现、模型性能结果及其他输出可能会被发表。" },
+];
+
+// Section B —— 可选 Yes/No（编号 15–19）
+const CONSENT_B = [
+  [15, { en: "I agree that my recordings and derived data may be reused by the Intelligent Behavior Understanding Group for future ethically approved academic research concerning facial expression, human behaviour understanding, computational modelling, video generation, computer vision or related methods, as described in the Participant Information Sheet.",
+         zh: "我同意我的录像及衍生数据可由 Intelligent Behavior Understanding Group 用于未来经伦理批准的、关于面部表情、人类行为理解、计算建模、视频生成、计算机视觉或相关方法的学术研究（如参与者须知所述）。" }],
+  [16, { en: "I agree that appropriately authorised Imperial College London researchers outside the immediate research team may access my derived, numerical research data (such as facial landmarks, facial movements, action units and embeddings) for approved, compatible academic research, subject to access controls and confidentiality requirements. (Access to my actual video recordings is covered separately in Section D.)",
+         zh: "我同意直接研究团队之外、经适当授权的帝国理工学院研究人员，可在访问控制与保密要求下，为经批准的、兼容的学术研究访问我的衍生数值研究数据（如面部关键点、面部运动、动作单元与嵌入）。（对我原始视频录像的访问，另由 D 节处理。）" }],
+  [17, { en: "I agree that approved external academic collaborators may receive or remotely access my derived, numerical research data under a data-sharing agreement and relevant safeguards. (Sharing of my actual video recordings is covered separately in Section D.)",
+         zh: "我同意经批准的外部学术合作者可在数据共享协议及相关保障措施下接收或远程访问我的衍生数值研究数据。（对我原始视频录像的共享，另由 D 节处理。）" }],
+  [18, { en: "Where applicable, I agree that the recording may include audio for the purposes described in the Participant Information Sheet.",
+         zh: "在适用情况下，我同意录制可包含音频，用途如参与者须知所述。" }],
+  [19, { en: "Where applicable, I agree that audio may be analysed or transcribed for the purposes described in the Participant Information Sheet.",
+         zh: "在适用情况下，我同意可对音频进行分析或转写，用途如参与者须知所述。" }],
+];
+
+// Section C —— 可选 Yes/No（编号 20–31）+ Level 2 选择（32–33）+ 附加限制自由文本
+const CONSENT_C = [
+  [20, { en: "I agree that identifiable still images or selected frames may appear in the main text, figures, tables, Extended Data, appendices or Supplementary Information of an academic journal or conference paper.",
+         zh: "我同意可识别的静态图像或选定帧可出现在学术期刊或会议论文的正文、图、表、扩展数据、附录或补充信息中。" }],
+  [21, { en: "I agree that identifiable short video clips may be included as Supplementary Video or other online material associated with an academic journal or conference paper.",
+         zh: "我同意可识别的短视频片段可作为补充视频或其他在线材料随学术期刊或会议论文一同提供。" }],
+  [22, { en: "I agree that identifiable still images or short video clips may be presented at academic conferences, seminars, workshops or research meetings.",
+         zh: "我同意可识别的静态图像或短视频片段可在学术会议、研讨会、工作坊或研究会议上展示。" }],
+  [23, { en: "I agree that identifiable still images or short video clips may be used in live or pre-recorded demonstrations of the research system.",
+         zh: "我同意可识别的静态图像或短视频片段可用于研究系统的现场或预录演示。" }],
+  [24, { en: "I agree that identifiable still images or short video clips may be displayed on official Imperial College London or approved project websites.",
+         zh: "我同意可识别的静态图像或短视频片段可展示在帝国理工学院官方或经批准的项目网站上。" }],
+  [25, { en: "I agree that identifiable materials may be included in a publicly accessible preprint before or during journal peer review.",
+         zh: "我同意可识别的材料可在期刊同行评审之前或期间纳入公开可访问的预印本。" }],
+  [26, { en: "I agree that identifiable examples may be used in teaching or researcher-training materials at Imperial College London.",
+         zh: "我同意可识别的示例可用于帝国理工学院的教学或研究者培训材料。" }],
+  [27, { en: "I agree that approved identifiable material may be published as part of an open-access article or supplementary material under the publication licence applied by the journal.",
+         zh: "我同意经批准的可识别材料可作为开放获取文章或补充材料的一部分，依据期刊适用的出版许可发表。" }],
+  [28, { en: "I agree that approved identifiable material may be used by the journal, publisher or Imperial College London to communicate the published research through official webpages or press materials.",
+         zh: "我同意经批准的可识别材料可由期刊、出版商或帝国理工学院用于通过官方网页或新闻材料传播已发表的研究。" }],
+  [29, { en: "I agree that approved identifiable material may be used on official social-media channels to communicate the published research.",
+         zh: "我同意经批准的可识别材料可在官方社交媒体渠道上用于传播已发表的研究。" }],
+  [30, { en: "I agree that an approved identifiable still image may be considered for a journal cover or other prominent publication artwork.",
+         zh: "我同意经批准的可识别静态图像可被考虑用作期刊封面或其他重要出版艺术图。" }],
+  [31, { en: "I agree that generated, reconstructed, animated or edited images or video that remain identifiable as depicting me may be included in the publication, presentation, website or demonstration uses that I have separately approved above.",
+         zh: "我同意仍可识别为描绘我的生成、重建、动画或编辑的图像或视频，可纳入我在上文单独批准的出版、演示、网站或演示用途中。" }],
+];
+const CONSENT_C_LEVEL2 = [
+  [32, { en: "I give advance permission for the research team to select materials within the Level 2 uses I approved, without contacting me again for each publication.",
+         zh: "我预先授权研究团队在我批准的 Level 2 用途范围内选用材料，而无需就每次发表再次联系我。" }],
+  [33, { en: "I require the research team to contact me to approve the specific identifiable image or clip before its first public release.",
+         zh: "我要求研究团队在首次公开发布特定可识别图像或片段之前联系我以获得批准。" }],
+];
+
+// Section D —— 可选 Yes/No（编号 34–39）
+const CONSENT_D = [
+  [34, { en: "I agree that my identifiable video recordings may be made available to verified researchers through a controlled-access process, subject to institutional approval and a data-use agreement.",
+         zh: "我同意我的可识别视频录像可通过受控访问流程提供给经核实的研究人员，须经机构批准并签订数据使用协议。" }],
+  [35, { en: "I agree that modified versions of my recordings - for example with audio removed, background cropped or other direct identifiers removed - may be made available to verified researchers through a controlled-access process.",
+         zh: "我同意我录像的修改版本——例如去除音频、裁剪背景或去除其他直接标识符——可通过受控访问流程提供给经核实的研究人员。" }],
+  [36, { en: "I agree that my identifiable video recordings may be included in a publicly downloadable research dataset accessible through the internet.",
+         zh: "我同意我的可识别视频录像可纳入通过互联网公开下载的研究数据集。" }],
+  [37, { en: "I agree that modified versions of my recordings may be included in a publicly downloadable research dataset accessible through the internet.",
+         zh: "我同意我录像的修改版本可纳入通过互联网公开下载的研究数据集。" }],
+  [38, { en: "I understand that controlled-access or public recipients may be located outside the United Kingdom.",
+         zh: "我理解受控访问或公开的接收方可能位于英国境外。" }],
+  [39, { en: "I understand that once a recording has been publicly downloaded, Imperial College London may be unable to control or reverse further copying, redistribution, analysis or attempts to identify individuals.",
+         zh: "我理解一旦录像被公开下载，帝国理工学院可能无法控制或撤销进一步的复制、再分发、分析或识别个人的尝试。" }],
+];
+
+// Section H —— 参与者声明（必选勾选）
+const CONSENT_H = [
+  { en: "I confirm that the choices recorded on this form reflect my decisions.",
+    zh: "我确认本表单上记录的选择反映了我的决定。" },
+  { en: "I understand that Level 2 publication/public display permission is optional and separate from consent to participate and Level 1 research use.",
+    zh: "我理解 Level 2 出版/公开展示许可是可选的，且独立于参与同意与 Level 1 研究使用。" },
+  { en: "I understand that Level 3 data-sharing permission is optional and separate from Levels 1 and 2.",
+    zh: "我理解 Level 3 数据共享许可是可选的，且独立于 Level 1 与 Level 2。" },
+  { en: "I understand that the detailed Yes/No selections above take precedence over this summary if there is any inconsistency.",
+    zh: "我理解如有不一致，上述逐项 Yes/No 选择优先于本摘要。" },
+];
+
+// 各节的说明/限制信息框（双语，展示用）
+const CONSENT_INFO = {
+  B: { en: "These permissions are optional. Please select either Yes or No for every item. You may take part in the current study even if you select No to any or all of these permissions. This section concerns whether other researchers may reuse or access your data for their own research. The distribution of your actual video recordings as a shareable dataset is covered separately in Section D.",
+       zh: "以下许可为可选。请对每一项选择 Yes 或 No。即使您对其中任意或全部项选择 No，仍可参加本研究。本节涉及的是：其他研究者能否为其自身研究复用或访问您的数据。将您的原始视频录像作为可共享数据集进行分发，另由 D 节单独处理。" },
+  C_intro: { en: "This section is optional and separate from the required consent in Section A. Please select either Yes or No for every item. Select Yes only for the specific forms of publication or public display you permit.",
+             zh: "本节为可选，独立于 A 节的必选同意。请对每一项选择 Yes 或 No。仅对您允许的特定出版或公开展示形式选择 Yes。" },
+  C_restrict: { en: "Restrictions applying unless you separately agree to Level 2 or Level 3: Identifiable images or video of your face will not be included in publicly accessible papers, websites, presentations, teaching materials or demonstrations. The team will use aggregate, numerical, synthetic, blurred, cropped or otherwise modified outputs for public reporting where reasonably possible. Removing your name or using a participant code does not necessarily make a facial image or video anonymous.",
+                zh: "除非您另行同意 Level 2 或 Level 3，否则：不会将可识别的您的面部图像或视频纳入公开可访问的论文、网站、演示、教学材料或演示中。在合理可能的情况下，团队将使用汇总、数值、合成、模糊、裁剪或以其他方式修改的输出用于公开报告。去除姓名或使用参与者编号并不必然使面部图像或视频匿名化。" },
+  C_generative: { en: "Generative and modified outputs: The approved research may generate, reconstruct, animate or edit facial images or videos. Generated outputs may depict expressions, movements or visual changes that were not directly recorded. Where an output remains reasonably identifiable as depicting you, it will be treated as identifiable material and will not be published or publicly displayed unless you separately select the relevant Level 2 permission.",
+                  zh: "生成与修改的输出：经批准的研究可能会生成、重建、动画化或编辑面部图像或视频。生成的输出可能呈现并非直接录制的表情、动作或视觉变化。若某输出仍可合理识别为描绘您，则将其视为可识别材料，除非您另行选择相关 Level 2 许可，否则不会发表或公开展示。" },
+  D_intro: { en: "This section is optional and separate from Sections A and C. Please select either Yes or No for every item. Consent to publish selected examples does not permit distribution of your complete recording as a dataset. This section concerns the distribution of your actual video recordings as a dataset. Permissions for other researchers to reuse or access your data for their own research are covered separately in Section B.",
+             zh: "本节为可选，独立于 A 节与 C 节。请对每一项选择 Yes 或 No。同意发表选定示例并不允许将您的完整录像作为数据集分发。本节涉及的是：将您的原始视频录像作为数据集进行分发。其他研究者为其自身研究复用或访问您数据的许可，另由 B 节单独处理。" },
+  D_default: { en: "Recommended default: Because full facial videos remain identifiable, the research team should normally use controlled access rather than open public release.",
+               zh: "推荐默认：由于完整面部视频仍可识别，研究团队通常应采用受控访问而非公开发布。" },
+  permanent: { en: "Permanent scientific record: Published articles, supplementary materials, preprints and recordings may remain accessible indefinitely through publisher websites, archives, repositories and indexing services. Public materials may be downloaded, copied, recorded, redistributed or used by third parties beyond Imperial College London's direct control. Complete removal may not be possible after release.",
+               zh: "永久科学记录：已发表的文章、补充材料、预印本和录像可能通过出版商网站、档案库、存储库和索引服务无限期地保持可访问。公开材料可能被下载、复制、录制、再分发或被帝国理工学院直接控制之外的第三方使用。发布后可能无法完全删除。" },
+};
+
+// 表单结构性文本（还原官方 PDF 版式用；双语）
+const CONSENT_DOC = {
+  form_title: { en: "CONSENT FORM FOR FACIAL EXPRESSION VIDEO DATA COLLECTION", zh: "面部表情视频数据采集知情同意书" },
+  form_subtitle: { en: "Research use, publication of identifiable material, and data sharing", zh: "研究使用、可识别材料的发表与数据共享" },
+  k_study: { en: "Study title", zh: "研究标题" },
+  v_study: { en: "Facial Expression Video Data Collection for Human Behaviour Understanding, Modelling and Generation",
+             zh: "面向人类行为理解、建模与生成的面部表情视频数据采集" },
+  k_group: { en: "Research group", zh: "研究组" },
+  v_group: { en: "Intelligent Behavior Understanding Group, Department of Computing, Imperial College London",
+             zh: "Intelligent Behavior Understanding Group，帝国理工学院计算系" },
+  k_lead: { en: "Lead Researcher", zh: "首席研究员" },
+  v_lead: { en: "Jingyi Wan, Department of Computing, Imperial College London\nEmail: j.wan@imperial.ac.uk",
+            zh: "Jingyi Wan，帝国理工学院计算系\nEmail: j.wan@imperial.ac.uk" },
+  important: { en: "Important: Please read the approved Participant Information Sheet before completing this form. Your participation is voluntary. Your face may be recognisable in the original recordings, even if your name is removed or a participant code is used. Please make one clear selection for every Yes/No item. Consent must be completed before recording begins. To keep your face private, you only need to complete Section A (Level 1). If you answer No to all items in Sections C and D, no identifiable image or video of you will ever be published or publicly displayed.",
+               zh: "重要提示：请在填写本表前阅读经批准的参与者须知。参与是自愿的。即使去除姓名或使用参与者编号，您的面部在原始录像中仍可能被识别。请对每个 Yes/No 项作出唯一明确的选择。必须在开始录制前完成同意。若您希望保持面部隐私：您只需完成 A 节（Level 1）即可。只要您对 C 节与 D 节的所有项目都选择“否 No”，就不会有任何可识别的您的图像或视频被发表或公开展示。" },
+  ck_head: { en: "Required confirmation", zh: "必选确认" },
+  tick_head: { en: "Tick", zh: "勾选" },
+  stmt_head: { en: "Statement / permission", zh: "陈述 / 许可" },
+  yes_head: { en: "Yes", zh: "是 Yes" },
+  no_head: { en: "No", zh: "否 No" },
+  name_ident: { en: "Name and identifiability: Your name will not be published with an image or video. A participant code or general non-identifying description may be used. However, your face may still allow people who know you, or facial-analysis systems, to recognise you.",
+                zh: "姓名与可识别性：您的姓名不会与图像或视频一同发表。可能使用参与者编号或一般性的非识别描述。但您的面部仍可能让认识您的人或面部分析系统识别出您。" },
+  E_title: { en: "E. Facial identification and biometric processing", zh: "E. 面部识别与生物特征处理" },
+  E_note: { en: "To be completed by the research team before use. The statement below describes the approved study.",
+            zh: "由研究团队在使用前填写。下述陈述描述了经批准的研究。" },
+  E_stmt2: { en: "This study may process facial features for the purpose of recognising, identifying or verifying individuals. The purpose, lawful basis, Article 9 condition where applicable, safeguards and withdrawal implications are specifically explained in the Participant Information Sheet.",
+             zh: "本研究可能为辨认、识别或验证个人身份而处理面部特征。其目的、法律依据、适用时的第 9 条条件、保障措施及退出影响均在参与者须知中专门说明。" },
+  F_title: { en: "F. Withdrawal and changes to optional permissions", zh: "F. 退出与可选许可的变更" },
+  F_intro: { en: "You may withdraw from further participation or withdraw one or more optional permissions by contacting the research contact below. Requests should include your participant ID where available. You understand that:",
+             zh: "您可通过联系下方研究联系人退出后续参与，或撤回一项或多项可选许可。请求应尽可能包含您的参与者 ID。您理解：" },
+  F_bullets: { en: [
+    "withdrawal will not affect your legal rights;",
+    "no new use relying on a withdrawn optional permission will begin after the withdrawal has been processed;",
+    "data that have been irreversibly anonymised may no longer be identifiable as yours and may be impossible to locate or delete;",
+    "withdrawal may not reverse completed analyses, model-development stages, lawful disclosures, published outputs or public materials already released with your permission;",
+    "material forming part of a permanent scientific record may not be removable from all copies, archives or third-party downloads;",
+    "handling of data incorporated into a trained model, including whether deletion, retraining or another mitigation is technically possible, is described in the Participant Information Sheet.",
+  ], zh: [
+    "退出不影响您的法定权利；",
+    "退出处理完成后，不会开始任何依赖已撤回可选许可的新用途；",
+    "已不可逆匿名化的数据可能不再可识别为您的数据，可能无法定位或删除；",
+    "退出可能无法撤销已完成的分析、模型开发阶段、合法披露，或已在您许可下发布的输出或公开材料；",
+    "构成永久科学记录一部分的材料，可能无法从所有副本、档案或第三方下载中移除；",
+    "对已纳入训练模型的数据的处理（包括删除、重训练或其他缓解措施在技术上是否可行）在参与者须知中说明。",
+  ] },
+  G_title: { en: "G. Data protection and complaints", zh: "G. 数据保护与投诉" },
+  G_text: { en: "Imperial College London is responsible for the use of personal data described in the Participant Information Sheet. Questions about the study or handling of personal data should first be directed to the research contact. The Participant Information Sheet should provide details of Imperial College London's Data Protection Officer and the right to raise a concern with the UK Information Commissioner's Office.",
+            zh: "帝国理工学院对参与者须知所述个人数据的使用负责。有关本研究或个人数据处理的问题，应首先联系研究联系人。参与者须知应提供帝国理工学院数据保护官的详情，以及向英国信息专员办公室（ICO）提出关切的权利。" },
+  sign_title: { en: "Participant declaration and signature", zh: "参与者声明与签名" },
+  k_pname: { en: "Participant name", zh: "参与者姓名" },
+  k_pid: { en: "Participant ID", zh: "参与者 ID" },
+  k_psig: { en: "Participant signature", zh: "参与者签名" },
+  k_pdt: { en: "Date and time", zh: "日期与时间" },
+  ec_title: { en: "For electronic consent completed through the study website", zh: "通过研究网站完成的电子同意" },
+  ec_cv: { en: "Approved consent form version displayed", zh: "所展示的批准同意书版本" },
+  ec_pv: { en: "Approved Participant Information Sheet version displayed", zh: "所展示的批准参与者须知版本" },
+  ec_sm: { en: "Electronic signature method", zh: "电子签名方式" },
+  ec_dt: { en: "Consent record date/time and time zone", zh: "同意记录日期/时间与时区" },
+  ec_au: { en: "Unique consent record / audit ID", zh: "唯一同意记录 / 审计 ID" },
+  ec_copy: { en: "Copy of completed form provided to participant by", zh: "向参与者提供已填表副本的方式" },
+  ec_copy_val: { en: "Automatic download in the participant's browser at submission",
+                 zh: "提交时在参与者浏览器中自动下载" },
+  ec_sm_val: { en: "Typed full name + drawn signature (in-browser)", zh: "键入全名 + 手写签名（浏览器内）" },
+  lang_note: { en: "The English version of this consent form is authoritative; any Chinese text is a reference translation.",
+               zh: "本同意书以英文版为准；中文为参考翻译。" },
+};
+
+/* --------------------------------------------------------------------- *
+ *  状态
+ * --------------------------------------------------------------------- */
+const S = {
+  lang: "en",
+  subject: {},
+  emotionIdx: 0,
+  state: "idle",           // idle -> counting -> recording -> review
+  countdownNum: null,
+  faceDetector: null,
+  detectorReady: false,
+  clips: {},               // emotion -> { blob, ext, timestamps:[], fps }
+  cur: null,               // 当前片段的临时数据
+  camStream: null,
+  camSettings: { width:0, height:0 },
+  rafId: null,
+  recordFrameTimes: [],
+  recorder: null,
+  recChunks: [],
+  reviewUrl: null,
+  uploadQueue: [], uploading: false, uploadStatus: {}, finishedAt: null,
+  mimeExt: "webm",
+  consent: null,          // 收集中的同意选择
+  consentRecord: null,    // 提交后生成的完整同意记录（json/html/签名）
+  consentStep: 0,
+};
+
+const $ = (id) => document.getElementById(id);
+const t = (key, kw) => {
+  let s = (TR[S.lang] && TR[S.lang][key]) || key;
+  if (kw) for (const k in kw) s = s.replace(`{${k}}`, kw[k]);
+  return s;
+};
+
+function show(screen) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(screen).classList.add("active");
+}
+
+/* --------------------------------------------------------------------- *
+ *  1. 登录页
+ * --------------------------------------------------------------------- */
+function renderLoginLabels() {
+  $("loginPartLabel").textContent = t("part2_label");
+  $("loginTitle").textContent = t("login_title");
+  $("lblName").textContent = t("field_name");
+  $("lblAge").textContent = t("field_age");
+  $("lblGender").textContent = t("field_gender");
+  $("lblNat").textContent = t("field_nationality");
+  $("btnSubmit").textContent = t("submit");
+}
+
+// 语言切换按钮（中文 / English）：直接点按切换，高亮当前语言
+function updateLangButtons() {
+  document.querySelectorAll(".lang-btns button").forEach(b =>
+    b.classList.toggle("active", b.dataset.lang === S.lang));
+}
+function setLang(lang) {
+  S.lang = lang;
+  updateLangButtons();
+  renderWelcome();
+  renderPis();
+  renderLoginLabels();
+  // 若正处于同意书页面，随语言重绘（英文为准，中文为参考翻译）
+  if ($("screen-consent").classList.contains("active")) { persistStepSoft(); renderConsentStep(); }
+}
+function renderPis() {
+  const zh = S.lang === "zh";
+  formatPisDoc($("pisText"), pisText());   // PIS 正文随语言切换
+  $("pisTitle").textContent = zh ? "参与者须知 Participant Information Sheet" : "Participant Information Sheet";
+  $("pisChkLbl").textContent = zh ? "我已阅读并理解上述参与者须知。" : "I have read and understood the Participant Information Sheet above.";
+  $("btnPisBack").textContent = zh ? "‹ 返回" : "‹ Back";
+  $("btnPisNext").textContent = zh ? "继续填写同意书 ›" : "Continue to consent ›";
+}
+document.querySelectorAll(".lang-btns button").forEach(b =>
+  b.addEventListener("click", () => setLang(b.dataset.lang)));
+
+// 注册页（在同意之后）：只补充人口学信息；姓名来自签名时键入的姓名（只读）。
+$("btnSubmit").addEventListener("click", () => {
+  const age = $("fAge").value.trim();
+  if (!/^\d+$/.test(age)) { alert(t("warn_age")); return; }
+  S.subject.age = age;
+  S.subject.gender = $("fGender").value;
+  S.subject.nationality = $("fNat").value.trim();
+  S.subject.language = S.lang;
+  renderInstructions();
+  show("screen-instr");
+});
+
+function showRegistration() {
+  // 姓名来自同意签名，只读；ID 已在同意提交时生成
+  $("fName").value = S.subject.name || "";
+  $("fName").readOnly = true;
+  $("fAge").value = ""; $("fNat").value = "";
+  renderLoginLabels();
+  show("screen-login");
+}
+
+/* --------------------------------------------------------------------- *
+ *  入口：PIS + 知情同意（须在开摄像头前完成）
+ * --------------------------------------------------------------------- */
+function initConsentState() {
+  formatPisDoc($("pisText"), pisText());
+  $("pisChk").checked = false;
+  S.subject = {};
+  S.consent = { pisRead: false, A: {}, B: {}, C: {}, C2: {}, D: {}, H: {},
+                freeText: "", typedName: "", agreed: false, signaturePng: null };
+  S.consentStep = 0;
+  S.consentRecord = null; S.consentPdfEn = null; S.consentPdfZh = null;
+}
+
+/* ---- 0. 欢迎页（说明两部分） ---- */
+function renderWelcome() {
+  $("welcomeTitle").textContent = t("welcome_title");
+  $("welcomeIntro").textContent = t("welcome_intro");
+  $("welcomePart1").textContent = t("welcome_part1");
+  $("welcomePart2").textContent = t("welcome_part2");
+  $("btnWelcomeStart").textContent = t("welcome_start");
+  $("pisPartLabel").textContent = t("part1_label");
+}
+$("btnWelcomeStart").addEventListener("click", () => { $("pisPartLabel").textContent = t("part1_label"); renderPis(); show("screen-pis"); });
+$("btnPisBack").addEventListener("click", () => show("screen-welcome"));
+
+/* 将纯文本实验须知渲染为带层级的 HTML：【…】/[…] -> 小节标题，数字行 -> 有序列表，
+ * "- " -> 圆点列表，"——/--" 附注并入上一条，★…★ -> 高亮重要标题。原文字符串不变。 */
+function formatInstrDoc(el, text) {
+  const escT = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const out = [];
+  let ol = null, ul = null, para = [];
+  const closePara = () => { if (para.length) { out.push(`<p>${para.join(" ")}</p>`); para = []; } };
+  const closeOl = () => { if (ol) { out.push(`<ol>${ol.join("")}</ol>`); ol = null; } };
+  const closeUl = () => { if (ul) { out.push(`<ul>${ul.join("")}</ul>`); ul = null; } };
+  const closeLists = () => { closePara(); closeOl(); closeUl(); };
+  const appendToLast = (arr, html) => { arr[arr.length - 1] = arr[arr.length - 1].replace(/<\/li>$/, html + "</li>"); };
+  let first = true, m;
+  for (const raw of text.split("\n")) {
+    const l = raw.trim();
+    if (!l) { closeLists(); continue; }
+    if (first) { first = false;
+      // 页面已有 "Instructions / 实验须知" 大标题，跳过正文中重复的首行
+      if (/^(instructions|实验须知)$/i.test(l)) continue; }
+    if (/^★/.test(l)) { closeLists();
+      out.push(`<h3 class="instr-important">${escT(l.replace(/[★\[\]【】]/g, "").trim())}</h3>`); continue; }
+    if (/^[\[【].+[\]】]$/.test(l)) { closeLists();
+      out.push(`<h3>${escT(l.replace(/^[\[【]|[\]】]$/g, ""))}</h3>`); continue; }
+    if ((m = l.match(/^(\d+)[.、]\s*(.*)$/))) { closePara(); closeUl(); if (!ol) ol = []; ol.push(`<li>${escT(m[2])}</li>`); continue; }
+    if (/^-\s+/.test(l)) { closePara(); closeOl(); if (!ul) ul = []; ul.push(`<li>${escT(l.replace(/^-\s+/, ""))}</li>`); continue; }
+    if (/^(--|——)/.test(l) && ol) { appendToLast(ol, `<div class="instr-note">${escT(l)}</div>`); continue; }
+    if (ol) { appendToLast(ol, " " + escT(l)); continue; }       // 数字项换行续文
+    if (ul) { appendToLast(ul, " " + escT(l)); continue; }       // 圆点项换行续文
+    para.push(escT(l));                                           // 连续行合并为同一段落
+  }
+  closeLists();
+  el.classList.add("pis-doc"); // 复用 PIS 排版样式
+  el.innerHTML = out.join("");
+}
+
+/* ---- 2b. 同意完成 -> 数据收集 过渡页 ---- */
+function renderConsentDone() {
+  $("cdTitle").textContent = t("cd_title");
+  $("cdMsg").textContent = t("cd_msg");
+  $("btnConsentDone").textContent = t("cd_continue");
+}
+$("btnConsentDone").addEventListener("click", () => showRegistration());
+$("btnPisNext").addEventListener("click", () => {
+  if (!$("pisChk").checked) {
+    alert(S.lang === "zh" ? "请先确认您已阅读参与者须知。" : "Please confirm you have read the Participant Information Sheet.");
+    return;
+  }
+  S.consent.pisRead = true;
+  renderConsentStep();
+  show("screen-consent");
+});
+
+// 步骤：0=Section A，1=B，2=C，3=D，4=复核+H+签名
+const CONSENT_STEPS = ["A", "B", "C", "D", "REVIEW"];
+
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c])); }
+function infoBox(text, cls) { return `<div class="consent-info ${cls||""}">${esc(text)}</div>`; }
+
+function ynItem(id, text, stored) {
+  const y = stored === "yes" ? "checked" : "", n = stored === "no" ? "checked" : "";
+  return `<div class="consent-item"><div class="q"><span class="qnum">${id}.</span>${esc(text)}</div>
+    <div class="consent-yn">
+      <label><input type="radio" name="yn_${id}" value="yes" ${y}/> Yes</label>
+      <label><input type="radio" name="yn_${id}" value="no" ${n}/> No</label>
+    </div></div>`;
+}
+function tickItem(idx, text, checked, num) {
+  return `<div class="consent-item"><label class="consent-tick">
+    <input type="checkbox" data-tick="${idx}" ${checked ? "checked" : ""}/>
+    <span class="q">${num != null ? `<span class="qnum">${num}.</span>` : ""}${esc(text)}</span></label></div>`;
+}
+
+function renderConsentStep() {
+  const step = CONSENT_STEPS[S.consentStep];
+  const zh = S.lang === "zh";
+  const body = $("consentBody");
+  $("consentError").textContent = "";
+  $("consentPartLabel").textContent = t("part1_label");
+  $("consentStep").textContent =
+    (zh ? `第 ${S.consentStep + 1} / ${CONSENT_STEPS.length} 步` : `Step ${S.consentStep + 1} / ${CONSENT_STEPS.length}`) +
+    `  ·  Consent form v${CONSENT_FORM_VERSION}`;
+  $("btnConsentBack").textContent = zh ? "‹ 上一步" : "‹ Back";
+  $("btnConsentBack").style.visibility = "visible";
+  const last = S.consentStep === CONSENT_STEPS.length - 1;
+  $("btnConsentNext").textContent = last ? (zh ? "签名并提交同意书 ✓" : "Sign & submit consent ✓") : (zh ? "下一步 ›" : "Next ›");
+  let html = "";
+  if (CONSENT_LANG_NOTE[S.lang]) html += infoBox(CONSENT_LANG_NOTE[S.lang]);
+
+  if (step === "A") {
+    html += infoBox(L(CONSENT_DOC.important));
+    html += `<div class="consent-section-title">${esc(L(CONSENT_TITLES.A))}</div>`;
+    html += `<div class="consent-section-intro">${esc(L(CONSENT_TITLES.A_intro))}</div>`;
+    CONSENT_A.forEach((o, i) => { html += tickItem(i, L(o), !!S.consent.A[i], i + 1); }); // 编号 1–14，与导出文档一致（B 节从 15 接续）
+  } else if (step === "B") {
+    html += `<div class="consent-section-title">${esc(L(CONSENT_TITLES.B))}</div>`;
+    html += infoBox(L(CONSENT_INFO.B));
+    CONSENT_B.forEach(([id, o]) => { html += ynItem(id, L(o), S.consent.B[id]); });
+  } else if (step === "C") {
+    html += `<div class="consent-section-title">${esc(L(CONSENT_TITLES.C))}</div>`;
+    html += infoBox(L(CONSENT_INFO.C_intro));
+    html += infoBox(L(CONSENT_INFO.C_restrict));
+    html += infoBox(L(CONSENT_INFO.C_generative));
+    CONSENT_C.forEach(([id, o]) => { html += ynItem(id, L(o), S.consent.C[id]); });
+    html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_TITLES.C_level2))}</div>`;
+    CONSENT_C_LEVEL2.forEach(([id, o]) => { html += ynItem(id, L(o), S.consent.C2[id]); });
+    html += infoBox(L(CONSENT_INFO.permanent));
+    html += `<div class="consent-item"><div class="q">${esc(L(CONSENT_TITLES.C_free))}</div>` +
+            `<textarea class="consent-free" id="consentFree">${esc(S.consent.freeText)}</textarea></div>`;
+  } else if (step === "D") {
+    html += `<div class="consent-section-title">${esc(L(CONSENT_TITLES.D))}</div>`;
+    html += infoBox(L(CONSENT_INFO.D_intro));
+    CONSENT_D.forEach(([id, o]) => { html += ynItem(id, L(o), S.consent.D[id]); });
+    html += infoBox(L(CONSENT_INFO.D_default));
+  } else if (step === "REVIEW") {
+    html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_TITLES.E))}</div>`;
+    html += `<div class="consent-section-intro">${esc(L(BIOMETRIC_STATEMENT))}</div>`;
+    // F/G 为信息性章节（与导出的正式同意书编号保持连续：E→F→G→H）
+    html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_DOC.F_title))}</div>`;
+    html += `<div class="consent-section-intro">${esc(L(CONSENT_DOC.F_intro))}</div>`;
+    html += `<ul class="consent-section-intro" style="padding-left:22px">${
+      L(CONSENT_DOC.F_bullets).map(b => `<li>${esc(b)}</li>`).join("")}</ul>`;
+    html += infoBox((zh ? "研究联系人：" : "Research contact: ") + RESEARCH_CONTACT);
+    html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_DOC.G_title))}</div>`;
+    html += `<div class="consent-section-intro">${esc(L(CONSENT_DOC.G_text))}</div>`;
+    html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_TITLES.H))}</div>`;
+    CONSENT_H.forEach((o, i) => { html += tickItem(i, L(o), !!S.consent.H[i]); });
+    html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_TITLES.sign))}</div>`;
+    html += `<div class="field-inline"><span>${zh ? "参与者姓名" : "Participant name"}</span>
+      <input type="text" id="sigName" value="${esc(S.consent.typedName)}" placeholder="${zh ? "键入您的法定全名" : "Type your full legal name"}"/></div>`;
+    html += `<div class="consent-section-intro">${zh
+      ? "提交后将生成参与者 ID；下一页请先登记基本信息（年龄、性别、国籍）后再开始录制。"
+      : "A participant ID will be assigned when you submit, and you will register basic details (age, gender, nationality) on the next page before recording."}</div>`;
+    html += `<label class="consent-tick" style="margin:10px 0"><input type="checkbox" id="sigAgree" ${S.consent.agreed ? "checked" : ""}/>
+      <span class="q">${zh
+        ? "在上方键入姓名并在下方签名，即表示我确认本表单记录的选择反映我的决定，并同意参加本研究。"
+        : "By typing my name above and signing below, I confirm that the choices recorded on this form reflect my decisions and I agree to take part."}</span></label>`;
+    html += `<div class="q" style="margin:8px 0 4px">${zh ? "请在下方手写签名：" : "Draw your signature:"}</div>
+      <canvas id="sigCanvas" class="sig-canvas"></canvas>
+      <div><button type="button" class="secondary" id="sigClear" style="margin-top:8px">${zh ? "清除签名" : "Clear signature"}</button></div>`;
+  }
+
+  body.innerHTML = html;
+  if (step === "REVIEW") setupSignatureCanvas();
+}
+
+// 从当前 DOM 读取本步选择存入 state，并校验；返回是否可继续
+function persistAndValidateStep() {
+  const step = CONSENT_STEPS[S.consentStep];
+  const err = $("consentError");
+  err.textContent = "";
+  if (step === "A") {
+    document.querySelectorAll('#consentBody input[data-tick]').forEach(el => {
+      S.consent.A[el.dataset.tick] = el.checked;
+    });
+    if (CONSENT_A.some((_, i) => !S.consent.A[i])) {
+      err.textContent = S.lang === "zh"
+        ? "A 节所有条目均为参加本研究所必需，请逐项勾选。"
+        : "All items in Section A are required to take part. Please tick every box.";
+      return false;
+    }
+  } else if (step === "B" || step === "C" || step === "D") {
+    const set = step === "B" ? CONSENT_B : step === "C" ? CONSENT_C : CONSENT_D;
+    const store = step === "B" ? S.consent.B : step === "C" ? S.consent.C : S.consent.D;
+    for (const [id] of set) {
+      const sel = document.querySelector(`#consentBody input[name="yn_${id}"]:checked`);
+      if (sel) store[id] = sel.value;
+    }
+    const missing = set.filter(([id]) => !store[id]).map(([id]) => id);
+    if (step === "C") {
+      for (const [id] of CONSENT_C_LEVEL2) {
+        const sel = document.querySelector(`#consentBody input[name="yn_${id}"]:checked`);
+        if (sel) S.consent.C2[id] = sel.value;
+      }
+      const freeEl = $("consentFree"); if (freeEl) S.consent.freeText = freeEl.value;
+      if (!S.consent.C2[32]) missing.push(32);
+      if (!S.consent.C2[33]) missing.push(33);
+      if (S.consent.C2[32] === "yes" && S.consent.C2[33] === "yes") {
+        err.textContent = S.lang === "zh"
+          ? "第 32 与 33 项相互矛盾（预先授权 vs. 每次都联系我），请只将其中一项选为 Yes。"
+          : "Items 32 and 33 are contradictory (advance permission vs. contact me each time). Please choose only one as Yes.";
+        return false;
+      }
+    }
+    if (missing.length) {
+      err.textContent = (S.lang === "zh"
+        ? "请对每一项选择 Yes 或 No。未选：" : "Please select Yes or No for every item. Missing: ") + missing.join(", ") + ".";
+      return false;
+    }
+  } else if (step === "REVIEW") {
+    document.querySelectorAll('#consentBody input[data-tick]').forEach(el => {
+      S.consent.H[el.dataset.tick] = el.checked;
+    });
+    S.consent.typedName = ($("sigName").value || "").trim();
+    S.consent.agreed = $("sigAgree").checked;
+    const zh = S.lang === "zh";
+    if (CONSENT_H.some((_, i) => !S.consent.H[i])) {
+      err.textContent = zh ? "请勾选 H 节所有声明项。" : "Please tick all declaration items in Section H."; return false;
+    }
+    if (!S.consent.typedName) { err.textContent = zh ? "请键入您的全名。" : "Please type your full name."; return false; }
+    if (!S.consent.agreed) { err.textContent = zh ? "请勾选签名上方的同意声明。" : "Please tick the agreement statement above the signature."; return false; }
+    if (!S.consent.signaturePng) { err.textContent = zh ? "请手写签名。" : "Please draw your signature."; return false; }
+  }
+  return true;
+}
+
+$("btnConsentBack").addEventListener("click", () => {
+  // 后退不强制校验，但保存已填内容
+  persistStepSoft();
+  if (S.consentStep === 0) { show("screen-pis"); return; }
+  S.consentStep--;
+  renderConsentStep();
+});
+
+// 仅保存不校验（用于后退时不丢已填内容）
+function persistStepSoft() {
+  const step = CONSENT_STEPS[S.consentStep];
+  if (step === "A" || step === "REVIEW") {
+    const target = step === "A" ? S.consent.A : S.consent.H;
+    document.querySelectorAll('#consentBody input[data-tick]').forEach(el => { target[el.dataset.tick] = el.checked; });
+  }
+  if (step === "B" || step === "C" || step === "D") {
+    const set = step === "B" ? CONSENT_B : step === "C" ? CONSENT_C : CONSENT_D;
+    const store = step === "B" ? S.consent.B : step === "C" ? S.consent.C : S.consent.D;
+    for (const [id] of set) {
+      const sel = document.querySelector(`#consentBody input[name="yn_${id}"]:checked`); if (sel) store[id] = sel.value;
+    }
+  }
+  if (step === "C") {
+    for (const [id] of CONSENT_C_LEVEL2) {
+      const sel = document.querySelector(`#consentBody input[name="yn_${id}"]:checked`); if (sel) S.consent.C2[id] = sel.value;
+    }
+    const freeEl = $("consentFree"); if (freeEl) S.consent.freeText = freeEl.value;
+  }
+  if (step === "REVIEW") {
+    const n = $("sigName"); if (n) S.consent.typedName = n.value.trim();
+    const a = $("sigAgree"); if (a) S.consent.agreed = a.checked;
+  }
+}
+
+$("btnConsentNext").addEventListener("click", async () => {
+  if (S.consentSubmitting) return;   // 提交/上传进行中：忽略重复点击，避免重复下载/重复提交
+  if (!persistAndValidateStep()) {
+    $("consentError").scrollIntoView({ block: "center", behavior: "smooth" });
+    return;
+  }
+  if (S.consentStep < CONSENT_STEPS.length - 1) {
+    S.consentStep++;
+    renderConsentStep();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  // 最后一步：签名并提交。提交期间锁定按钮，防止重复触发。
+  S.consentSubmitting = true;
+  $("btnConsentNext").disabled = true;
+  $("btnConsentBack").disabled = true;
+  try {
+    await submitConsent();
+  } finally {
+    S.consentSubmitting = false;
+    $("btnConsentNext").disabled = false;
+    $("btnConsentBack").disabled = false;
+  }
+});
+
+/* ---- 手写签名画布 ---- */
+function setupSignatureCanvas() {
+  const cv = $("sigCanvas");
+  const ctx = cv.getContext("2d");
+  // 用显示尺寸设置位图分辨率（含 DPR），保证清晰
+  const dpr = window.devicePixelRatio || 1;
+  const rect = cv.getBoundingClientRect();
+  cv.width = Math.max(rect.width, 1) * dpr;
+  cv.height = Math.max(rect.height, 1) * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#111";
+  let drawing = false, has = false, last = null;
+  const pos = (e) => {
+    const r = cv.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
+  };
+  const start = (e) => { e.preventDefault(); drawing = true; last = pos(e); };
+  const move = (e) => {
+    if (!drawing) return; e.preventDefault();
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p; has = true;
+  };
+  const end = () => {
+    if (!drawing) return; drawing = false;
+    if (has) S.consent.signaturePng = cv.toDataURL("image/png");
+  };
+  cv.addEventListener("mousedown", start); cv.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", end);
+  cv.addEventListener("touchstart", start, { passive: false });
+  cv.addEventListener("touchmove", move, { passive: false });
+  cv.addEventListener("touchend", end);
+  $("sigClear").addEventListener("click", () => {
+    ctx.clearRect(0, 0, cv.width, cv.height); has = false; S.consent.signaturePng = null;
+  });
+  // 若返回本步，重绘之前的签名
+  if (S.consent.signaturePng) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    img.src = S.consent.signaturePng;
+    has = true;
+  }
+}
+
+/* ---- 提交同意：生成 subject_id、记录（json/html/pdf/png）、上传、给副本 ---- */
+async function submitConsent() {
+  // 生成匿名 subject_id（参与者编号，不含姓名——与 PIS 的假名化承诺一致；姓名仅存于同意书记录）
+  const stamp = currentTimestamp();
+  const rand = Math.random().toString(36).slice(2, 6);
+  S.subject = { name: S.consent.typedName, subject_id: `P${stamp}_${rand}`,
+                created_at: stamp, language: S.lang };
+
+  const rec = buildConsentRecord();
+  rec.stamp = stamp;
+  S.consentRecord = rec;
+
+  // 生成 PDF：英文（矢量，权威版，供 Nature）始终生成；中文显示时额外生成中文（图片版）
+  try { S.consentPdfEn = await buildConsentPdf(rec, "en"); }
+  catch (e) { console.error("consent PDF (en) failed", e); S.consentPdfEn = null; }
+  if (S.lang === "zh") {
+    try { S.consentPdfZh = await buildConsentPdf(rec, "zh"); }
+    catch (e) { console.error("consent PDF (zh) failed", e); S.consentPdfZh = null; }
+  } else S.consentPdfZh = null;
+
+  // 立即给参与者一份其阅读语言的可下载副本（附录要求）——优先 PDF
+  const dlPdf = (S.lang === "zh" && S.consentPdfZh) ? S.consentPdfZh : S.consentPdfEn;
+  if (dlPdf) downloadBytes(dlPdf, "application/pdf", `${rec.subject_id}_consent_${S.lang}.pdf`);
+  else downloadBytes(new TextEncoder().encode(consentToHtml(rec, S.lang)), "text/html", `${rec.subject_id}_consent_${S.lang}.html`);
+
+  // 上传到 Drive 的 <subject_id>/consent/（时间戳命名、不覆盖）——失败也放行，
+  // 记录仍在最终 zip 里，不会丢；但会提示。
+  if (UPLOAD_URL) {
+    const zh = S.lang === "zh";
+    $("consentError").style.color = "#0ca88f";
+    $("consentError").textContent = zh ? "正在上传同意记录…" : "Uploading consent record…";
+    try {
+      await uploadConsent(rec);
+      $("consentError").textContent = zh ? "同意记录已保存并上传 ✓" : "Consent recorded and uploaded ✓";
+    } catch (e) {
+      console.error(e);
+      $("consentError").style.color = "#d4506c";
+      $("consentError").textContent = zh
+        ? "同意记录已保存并下载到本机，但云端上传失败。"
+        : "Consent saved & downloaded, but cloud upload failed. A copy was downloaded to this device.";
+    }
+  }
+  // 进入「同意完成 -> 开始数据收集」过渡页，再到注册页
+  renderConsentDone();
+  show("screen-consent-done");
+}
+
+function downloadBytes(bytes, mime, fname) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  const a = document.createElement("a");
+  a.href = url; a.download = fname; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function bytesToBase64(bytes) {
+  let bin = ""; const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+function buildConsentRecord() {
+  const c = S.consent;
+  const now = new Date();
+  const answers = {
+    section_A_required: CONSENT_A.map((o, i) => ({ text_en: o.en, text_zh: o.zh, agreed: !!c.A[i] })),
+    section_B: CONSENT_B.map(([id, o]) => ({ id, text_en: o.en, text_zh: o.zh, answer: c.B[id] || null })),
+    section_C: CONSENT_C.map(([id, o]) => ({ id, text_en: o.en, text_zh: o.zh, answer: c.C[id] || null })),
+    section_C_level2: CONSENT_C_LEVEL2.map(([id, o]) => ({ id, text_en: o.en, text_zh: o.zh, answer: c.C2[id] || null })),
+    level2_additional_restrictions: c.freeText || "",
+    section_D: CONSENT_D.map(([id, o]) => ({ id, text_en: o.en, text_zh: o.zh, answer: c.D[id] || null })),
+    section_E_biometric_statement: { en: BIOMETRIC_STATEMENT.en, zh: BIOMETRIC_STATEMENT.zh },
+    section_H_declaration: CONSENT_H.map((o, i) => ({ text_en: o.en, text_zh: o.zh, agreed: !!c.H[i] })),
+  };
+  return {
+    subject_id: S.subject.subject_id,
+    participant_name: c.typedName,
+    participant_info: { ...S.subject },
+    consent_form_version: CONSENT_FORM_VERSION,
+    pis_version: PIS_VERSION,
+    pis_confirmed_read: !!c.pisRead,
+    pis_display_language: S.lang,          // 参与者阅读 PIS 时的语言
+    pis_text_shown: pisTextForLang(S.lang), // 参与者当次看到的 PIS 正文（留档）
+    display_language: S.lang,   // 参与者阅读同意书时的语言（英文为准）
+    authoritative_language: "en",
+    signature_method: "typed_full_name + drawn_signature",
+    agreement_statement_accepted: !!c.agreed,
+    consent_datetime_iso: now.toISOString(),
+    consent_datetime_local: now.toString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone_offset_min: -now.getTimezoneOffset(),
+    audit_id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+    user_agent: navigator.userAgent,
+    page_url: location.href,
+    answers,
+    signature_png_dataurl: c.signaturePng || "",
+  };
+}
+
+// 忠实还原官方同意书版式的 HTML（en 为准；zh 为参考翻译）
+function consentToHtml(rec, lang) {
+  lang = lang || "en";
+  const zh = lang === "zh", a = rec.answers, D = CONSENT_DOC;
+  const LL = (o) => (o && (o[lang] != null ? o[lang] : o.en)) || "";
+  const tx = (x) => zh ? (x.text_zh || x.text_en) : x.text_en;
+  const nl = (v) => esc(v).replace(/\n/g, "<br>");
+  const box = (o, cls) => `<div class="box ${cls || ""}">${esc(LL(o))}</div>`;
+  const kv = (k, v) => `<tr><td class="k">${esc(k)}</td><td>${nl(v)}</td></tr>`;
+  const ck = (rows) => `<table class="grid"><tr><th>${esc(LL(D.ck_head))}</th><th class="c">${esc(LL(D.tick_head))}</th></tr>` +
+    rows.map(x => `<tr><td>${x._num ? `<b>${x._num}.</b> ` : ""}${esc(tx(x))}</td><td class="c">${x.agreed ? "☑" : "☐"}</td></tr>`).join("") + `</table>`;
+  const yn = (rows) => `<table class="grid"><tr><th>${esc(LL(D.stmt_head))}</th><th class="c">${esc(LL(D.yes_head))}</th><th class="c">${esc(LL(D.no_head))}</th></tr>` +
+    rows.map(x => `<tr><td><b>${x.id}.</b> ${esc(tx(x))}</td><td class="c">${x.answer === "yes" ? "☑" : "☐"}</td><td class="c">${x.answer === "no" ? "☑" : "☐"}</td></tr>`).join("") + `</table>`;
+  const aRows = a.section_A_required.map((x, i) => ({ ...x, _num: i + 1 }));
+  const eStmt = zh ? (a.section_E_biometric_statement.zh || a.section_E_biometric_statement.en) : a.section_E_biometric_statement.en;
+  return `<!doctype html><meta charset="utf-8"><title>Consent ${esc(rec.subject_id)} (${lang})</title>
+<style>
+ body{font-family:Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;max-width:820px;margin:24px auto;padding:0 18px;color:#111;font-size:13px;line-height:1.5}
+ h1{font-size:20px;text-align:center;margin:6px 0}.sub{text-align:center;font-style:italic;color:#333;margin:0 0 14px}
+ h2{font-size:15px;color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:2px;margin:20px 0 8px}
+ h3{font-size:13.5px;color:#1a3c6e;margin:14px 0 6px}
+ table{border-collapse:collapse;width:100%;margin:8px 0}
+ .grid th{background:#dbe6f3;text-align:left}.grid th,.grid td{border:1px solid #9bb0c0;padding:6px 8px;vertical-align:top}
+ .grid th.c,.grid td.c{width:54px;text-align:center;font-size:16px}
+ .meta td{border:1px solid #ccc;padding:6px 8px}.meta td.k{background:#f0f0f0;font-weight:bold;width:40%}
+ .box{border:1px solid #d9c98a;background:#fdf6e3;border-radius:5px;padding:9px 11px;margin:8px 0;font-size:12px}
+ .box.green{border-color:#bcd9b0;background:#eef6ea}.box.pink{border-color:#e6b7b0;background:#fbeeec}
+ .note{color:#a15;font-weight:bold;margin:2px 0 12px}ul{margin:6px 0 6px 18px;padding:0}li{margin:3px 0}
+ .sig{border:1px solid #ccc;max-width:260px;display:block;margin:4px 0;background:#fff}
+</style>
+<h1>${esc(LL(D.form_title))}</h1>
+<p class="sub">${esc(LL(D.form_subtitle))}</p>
+${rec.display_language === "zh" ? `<p class="note">${esc(LL(D.lang_note))}</p>` : ""}
+<table class="meta">${kv(LL(D.k_study), LL(D.v_study))}${kv(LL(D.k_group), LL(D.v_group))}${kv(LL(D.k_lead), LL(D.v_lead))}</table>
+${box(D.important)}
+<h2>${esc(LL(CONSENT_TITLES.A))}</h2>${ck(aRows)}
+<h2>${esc(LL(CONSENT_TITLES.B))}</h2>${box(CONSENT_INFO.B, "green")}${yn(a.section_B)}
+${box(CONSENT_INFO.C_restrict)}${box(CONSENT_INFO.C_generative)}
+<h2>${esc(LL(CONSENT_TITLES.C))}</h2>${box(CONSENT_INFO.C_intro, "pink")}${yn(a.section_C)}
+<h3>${esc(LL(CONSENT_TITLES.C_level2))}</h3>${yn(a.section_C_level2)}
+${box(D.name_ident)}${box(CONSENT_INFO.permanent)}
+<p><b>${esc(zh ? "Level 2 附加限制" : "Additional restrictions on Level 2 use")}:</b> ${esc(a.level2_additional_restrictions || "-")}</p>
+<h2>${esc(LL(CONSENT_TITLES.D))}</h2>${box(CONSENT_INFO.D_intro, "pink")}${yn(a.section_D)}${box(CONSENT_INFO.D_default)}
+<h2>${esc(LL(D.E_title))}</h2>${box(D.E_note)}
+<table class="grid"><tr><th>${esc(LL(D.stmt_head))}</th><th class="c">${esc(LL(D.tick_head))}</th></tr>
+<tr><td>${esc(eStmt)}</td><td class="c">☑</td></tr>
+<tr><td>${esc(LL(D.E_stmt2))}</td><td class="c">☐</td></tr></table>
+<h2>${esc(LL(D.F_title))}</h2><p>${esc(LL(D.F_intro))}</p>
+<p><b>${esc(zh ? "研究联系人" : "Research contact")}:</b><br>${nl(RESEARCH_CONTACT)}</p>
+<ul>${LL(D.F_bullets).map(b => `<li>${esc(b)}</li>`).join("")}</ul>
+<h2>${esc(LL(D.G_title))}</h2><p>${esc(LL(D.G_text))}</p>
+<h2>${esc(LL(CONSENT_TITLES.H))}</h2>${ck(a.section_H_declaration)}
+<h3>${esc(LL(D.sign_title))}</h3>
+<table class="meta">${kv(LL(D.k_pname), rec.participant_name)}${kv(LL(D.k_pid), rec.subject_id)}${kv(LL(D.k_pdt), rec.consent_datetime_local)}</table>
+<p><b>${esc(LL(D.k_psig))}:</b><br>${rec.signature_png_dataurl ? `<img class="sig" src="${rec.signature_png_dataurl}" alt="signature"/>` : "-"}</p>
+<h3>${esc(LL(D.ec_title))}</h3>
+<table class="meta">${kv(LL(D.ec_cv), "v" + rec.consent_form_version)}${kv(LL(D.ec_pv), "v" + rec.pis_version)}${kv(LL(D.ec_sm), LL(D.ec_sm_val))}${kv(LL(D.ec_dt), rec.consent_datetime_local + " (" + rec.timezone + ")")}${kv(LL(D.ec_au), rec.audit_id)}${kv(LL(D.ec_copy), LL(D.ec_copy_val))}</table>`;
+}
+
+async function uploadConsent(rec) {
+  const sigB64 = rec.signature_png_dataurl ? rec.signature_png_dataurl.split(",")[1] : "";
+  const payload = {
+    type: "consent",
+    subject_id: rec.subject_id,
+    stamp: rec.stamp,
+    display_language: rec.display_language,
+    consent_json: JSON.stringify(rec, null, 2),
+    consent_html_en: consentToHtml(rec, "en"),
+    consent_pdf_en_b64: S.consentPdfEn ? bytesToBase64(S.consentPdfEn) : "",
+    signature_png_b64: sigB64,
+    // 参与者当次看到的 PIS 正文（中英两版留档）+ 版本号
+    pis_version: rec.pis_version,
+    pis_txt_en: pisTextForLang("en"),
+    pis_txt_zh: pisTextForLang("zh"),
+  };
+  // 中文时额外保存中文版本
+  if (rec.display_language === "zh") {
+    payload.consent_html_zh = consentToHtml(rec, "zh");
+    payload.consent_pdf_zh_b64 = S.consentPdfZh ? bytesToBase64(S.consentPdfZh) : "";
+  }
+  await postJSON(payload);
+}
+
+/* --------------------------------------------------------------------- *
+ *  纯 JS 生成同意书 PDF —— 用 canvas 忠实还原官方表单版式（分节表格 / 信息框 /
+ *  Yes-No 勾选 / 签名 / 电子同意审计块），逐页转 JPEG 嵌入 PDF。中英文均可渲染。
+ *  英文为准；中文为参考翻译。
+ * --------------------------------------------------------------------- */
+function latin1Bytes(s) {
+  const b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xFF;
+  return b;
+}
+function loadImg(src) {
+  return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+}
+// 优先用官方可填写 PDF 模板（pdf-lib）；失败则回退 canvas 图片版
+async function buildConsentPdf(rec, lang) {
+  lang = lang || "en";
+  try { return await fillConsentPdfTemplate(rec, lang); }
+  catch (e) { console.warn("consent template fill failed; fallback to canvas PDF:", e); return await buildConsentPdfCanvas(rec, lang); }
+}
+
+async function buildConsentPdfCanvas(rec, lang) {
+  lang = lang || "en";
+  const zh = lang === "zh", a = rec.answers, D = CONSENT_DOC;
+  const LL = (o) => (o && (o[lang] != null ? o[lang] : o.en)) || "";
+  const tx = (x) => zh ? (x.text_zh || x.text_en) : x.text_en;
+  const s = 2, Wpt = 595, Hpt = 842;
+  const cw = Wpt * s, chh = Hpt * s, M = 46 * s, bottom = 46 * s, W = cw - 2 * M;
+  const FF = 'Helvetica,Arial,"PingFang SC","Microsoft YaHei","Heiti SC",sans-serif';
+  const font = (px, b) => `${b ? "bold " : ""}${px * s}px ${FF}`;
+  const pages = []; let cv, ctx, y;
+  const newPage = () => {
+    cv = document.createElement("canvas"); cv.width = cw; cv.height = chh;
+    ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, chh);
+    ctx.textBaseline = "top"; y = M;
+  };
+  newPage();
+  const brk = (h) => { if (y + h > chh - bottom) { pages.push(cv); newPage(); return true; } return false; };
+  const wrap = (text, px, b, maxW) => {
+    ctx.font = font(px, b);
+    const toks = String(text).match(/[A-Za-z0-9@._%+\-\/:]+|\s|[^\sA-Za-z0-9]/g) || [];
+    const out = []; let cur = "";
+    for (const tk of toks) { const t = cur + tk; if (ctx.measureText(t).width <= maxW || !cur) cur = t; else { out.push(cur.replace(/\s+$/, "")); cur = tk === " " ? "" : tk; } }
+    if (cur.trim() !== "" || !out.length) out.push(cur);
+    return out;
+  };
+  const para = (text, px, b, x, color, maxW) => {
+    x = x == null ? M : x; maxW = maxW == null ? (W - (x - M)) : maxW;
+    const lines = wrap(text, px, b, maxW), lh = px * s * 1.45;
+    ctx.fillStyle = color || "#111"; ctx.font = font(px, b);
+    for (const ln of lines) { brk(lh); ctx.fillText(ln, x, y); y += lh; }
+  };
+  const gap = (h) => { y += h * s; };
+  const h1 = (text) => { const lh = 16 * s * 1.3, lines = wrap(text, 16, true, W); ctx.font = font(16, true); ctx.textAlign = "center"; ctx.fillStyle = "#111"; for (const ln of lines) { brk(lh); ctx.fillText(ln, cw / 2, y); y += lh; } ctx.textAlign = "left"; };
+  const center = (text, px, color) => { const lh = px * s * 1.3, lines = wrap(text, px, false, W); ctx.font = font(px, false); ctx.textAlign = "center"; ctx.fillStyle = color || "#333"; for (const ln of lines) { brk(lh); ctx.fillText(ln, cw / 2, y); y += lh; } ctx.textAlign = "left"; };
+  const h2 = (text) => { gap(7); brk(20 * s); ctx.font = font(12.5, true); ctx.fillStyle = "#1a3c6e"; ctx.fillText(text, M, y); y += 14 * s; ctx.strokeStyle = "#1a3c6e"; ctx.lineWidth = 1.5 * s; ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(cw - M, y); ctx.stroke(); gap(4); };
+  const h3 = (text) => { gap(4); para(text, 11, true, M, "#1a3c6e"); gap(1); };
+  const infoBox = (text, fill, border) => {
+    const px = 8.5, pad = 6 * s, lines = wrap(text, px, false, W - 2 * pad - 4 * s), lh = px * s * 1.4, h = lines.length * lh + 2 * pad;
+    brk(h + 4 * s);
+    ctx.fillStyle = fill; ctx.strokeStyle = border; ctx.lineWidth = 1 * s;
+    ctx.fillRect(M, y, W, h); ctx.strokeRect(M, y, W, h);
+    ctx.fillStyle = "#111"; ctx.font = font(px, false);
+    let yy = y + pad; for (const ln of lines) { ctx.fillText(ln, M + pad + 2 * s, yy); yy += lh; }
+    y += h + 5 * s;
+  };
+  const checkbox = (cx, cy, on) => {
+    const sz = 10 * s; ctx.strokeStyle = "#333"; ctx.lineWidth = 1 * s; ctx.strokeRect(cx - sz / 2, cy - sz / 2, sz, sz);
+    if (on) { ctx.strokeStyle = "#111"; ctx.lineWidth = 1.6 * s; ctx.beginPath(); ctx.moveTo(cx - sz / 2 + 2 * s, cy); ctx.lineTo(cx - 1 * s, cy + sz / 2 - 2 * s); ctx.lineTo(cx + sz / 2 - 1 * s, cy - sz / 2 + 2 * s); ctx.stroke(); }
+  };
+  const gridHead = (cols) => {
+    const hRow = 18 * s; brk(hRow);
+    let x = M; ctx.font = font(9, true);
+    for (const c of cols) {
+      ctx.fillStyle = "#dbe6f3"; ctx.fillRect(x, y, c.w, hRow);
+      ctx.strokeStyle = "#9bb0c0"; ctx.lineWidth = 1 * s; ctx.strokeRect(x, y, c.w, hRow);
+      ctx.fillStyle = "#111"; ctx.textAlign = c.center ? "center" : "left";
+      ctx.fillText(c.label, c.center ? x + c.w / 2 : x + 5 * s, y + 4 * s); x += c.w;
+    }
+    ctx.textAlign = "left"; y += hRow;
+  };
+  const colC = 46 * s;
+  const ckRow = (text, num, checked) => {
+    const tw = W - colC, label = (num ? num + ". " : "") + text;
+    const lines = wrap(label, 8.5, false, tw - 8 * s), lh = 8.5 * s * 1.35, pad = 5 * s, rowH = Math.max(lines.length * lh, 16 * s) + 2 * pad;
+    brk(rowH);
+    ctx.strokeStyle = "#9bb0c0"; ctx.lineWidth = 1 * s; ctx.strokeRect(M, y, tw, rowH); ctx.strokeRect(M + tw, y, colC, rowH);
+    ctx.fillStyle = "#111"; ctx.font = font(8.5, false); let yy = y + pad; for (const ln of lines) { ctx.fillText(ln, M + 5 * s, yy); yy += lh; }
+    checkbox(M + tw + colC / 2, y + rowH / 2, checked); y += rowH;
+  };
+  const ynRow = (id, text, answer) => {
+    const tw = W - 2 * colC;
+    const lines = wrap(id + ". " + text, 8.5, false, tw - 8 * s), lh = 8.5 * s * 1.35, pad = 5 * s, rowH = Math.max(lines.length * lh, 16 * s) + 2 * pad;
+    brk(rowH);
+    ctx.strokeStyle = "#9bb0c0"; ctx.lineWidth = 1 * s;
+    ctx.strokeRect(M, y, tw, rowH); ctx.strokeRect(M + tw, y, colC, rowH); ctx.strokeRect(M + tw + colC, y, colC, rowH);
+    ctx.fillStyle = "#111"; ctx.font = font(8.5, false); let yy = y + pad; for (const ln of lines) { ctx.fillText(ln, M + 5 * s, yy); yy += lh; }
+    checkbox(M + tw + colC / 2, y + rowH / 2, answer === "yes");
+    checkbox(M + tw + colC + colC / 2, y + rowH / 2, answer === "no"); y += rowH;
+  };
+  const kvRow = (k, v) => {
+    const kw = W * 0.4, vw = W - kw;
+    const vlines = wrap(String(v).replace(/\n/g, " "), 9, false, vw - 8 * s), lh = 9 * s * 1.4, pad = 5 * s, rowH = Math.max(vlines.length * lh, 14 * s) + 2 * pad;
+    brk(rowH);
+    ctx.fillStyle = "#f0f0f0"; ctx.fillRect(M, y, kw, rowH); ctx.strokeStyle = "#ccc"; ctx.lineWidth = 1 * s; ctx.strokeRect(M, y, kw, rowH); ctx.strokeRect(M + kw, y, vw, rowH);
+    ctx.fillStyle = "#111"; ctx.font = font(9, true); ctx.fillText(k, M + 5 * s, y + pad);
+    ctx.font = font(9, false); let yy = y + pad; for (const ln of vlines) { ctx.fillText(ln, M + kw + 5 * s, yy); yy += lh; }
+    y += rowH;
+  };
+
+  // ---- 正文 ----
+  h1(LL(D.form_title));
+  center(LL(D.form_subtitle), 10, "#333"); gap(4);
+  if (rec.display_language === "zh") { para(LL(D.lang_note), 9, true, M, "#a15"); gap(2); }
+  kvRow(LL(D.k_study), LL(D.v_study));
+  kvRow(LL(D.k_group), LL(D.v_group));
+  kvRow(LL(D.k_lead), LL(D.v_lead)); gap(4);
+  infoBox(LL(D.important), "#fdf6e3", "#d9c98a");
+
+  h2(LL(CONSENT_TITLES.A));
+  gridHead([{ w: W - colC, label: LL(D.ck_head) }, { w: colC, label: LL(D.tick_head), center: true }]);
+  a.section_A_required.forEach((x, i) => ckRow(tx(x), i + 1, x.agreed));
+
+  h2(LL(CONSENT_TITLES.B));
+  infoBox(LL(CONSENT_INFO.B), "#eef6ea", "#bcd9b0");
+  gridHead([{ w: W - 2 * colC, label: LL(D.stmt_head) }, { w: colC, label: LL(D.yes_head), center: true }, { w: colC, label: LL(D.no_head), center: true }]);
+  a.section_B.forEach(x => ynRow(x.id, tx(x), x.answer));
+  infoBox(LL(CONSENT_INFO.C_restrict), "#fdf6e3", "#d9c98a");
+  infoBox(LL(CONSENT_INFO.C_generative), "#fdf6e3", "#d9c98a");
+
+  h2(LL(CONSENT_TITLES.C));
+  infoBox(LL(CONSENT_INFO.C_intro), "#fbeeec", "#e6b7b0");
+  gridHead([{ w: W - 2 * colC, label: LL(D.stmt_head) }, { w: colC, label: LL(D.yes_head), center: true }, { w: colC, label: LL(D.no_head), center: true }]);
+  a.section_C.forEach(x => ynRow(x.id, tx(x), x.answer));
+  h3(LL(CONSENT_TITLES.C_level2));
+  gridHead([{ w: W - 2 * colC, label: LL(D.stmt_head) }, { w: colC, label: LL(D.yes_head), center: true }, { w: colC, label: LL(D.no_head), center: true }]);
+  a.section_C_level2.forEach(x => ynRow(x.id, tx(x), x.answer));
+  infoBox(LL(D.name_ident), "#fdf6e3", "#d9c98a");
+  infoBox(LL(CONSENT_INFO.permanent), "#fdf6e3", "#d9c98a");
+  para((zh ? "Level 2 附加限制: " : "Additional restrictions on Level 2 use: ") + (a.level2_additional_restrictions || "-"), 9, false); gap(2);
+
+  h2(LL(CONSENT_TITLES.D));
+  infoBox(LL(CONSENT_INFO.D_intro), "#fbeeec", "#e6b7b0");
+  gridHead([{ w: W - 2 * colC, label: LL(D.stmt_head) }, { w: colC, label: LL(D.yes_head), center: true }, { w: colC, label: LL(D.no_head), center: true }]);
+  a.section_D.forEach(x => ynRow(x.id, tx(x), x.answer));
+  infoBox(LL(CONSENT_INFO.D_default), "#fdf6e3", "#d9c98a");
+
+  h2(LL(D.E_title));
+  infoBox(LL(D.E_note), "#fdf6e3", "#d9c98a");
+  gridHead([{ w: W - colC, label: LL(D.stmt_head) }, { w: colC, label: LL(D.tick_head), center: true }]);
+  ckRow(zh ? (a.section_E_biometric_statement.zh || a.section_E_biometric_statement.en) : a.section_E_biometric_statement.en, null, true);
+  ckRow(LL(D.E_stmt2), null, false);
+
+  h2(LL(D.F_title));
+  para(LL(D.F_intro), 9, false); gap(1);
+  para((zh ? "研究联系人: " : "Research contact: ") + RESEARCH_CONTACT.replace(/\n/g, "  "), 9, true); gap(1);
+  LL(D.F_bullets).forEach(b => para("•  " + b, 8.5, false, M + 6 * s, "#111", W - 6 * s));
+
+  h2(LL(D.G_title));
+  para(LL(D.G_text), 9, false);
+
+  h2(LL(CONSENT_TITLES.H));
+  gridHead([{ w: W - colC, label: LL(D.ck_head) }, { w: colC, label: LL(D.tick_head), center: true }]);
+  a.section_H_declaration.forEach(x => ckRow(tx(x), null, x.agreed));
+
+  h3(LL(D.sign_title));
+  kvRow(LL(D.k_pname), rec.participant_name);
+  kvRow(LL(D.k_pid), rec.subject_id);
+  kvRow(LL(D.k_pdt), rec.consent_datetime_local);
+  gap(2); para(LL(D.k_psig) + ":", 9, true);
+  if (rec.signature_png_dataurl) {
+    try {
+      const img = await loadImg(rec.signature_png_dataurl);
+      const sw = Math.min(200 * s, W), sh = sw * img.height / img.width;
+      brk(sh + 4 * s);
+      ctx.fillStyle = "#fff"; ctx.fillRect(M, y, sw, sh); ctx.strokeStyle = "#ccc"; ctx.lineWidth = 1 * s; ctx.strokeRect(M, y, sw, sh);
+      ctx.drawImage(img, M, y, sw, sh); y += sh + 4 * s;
+    } catch (e) { /* 忽略签名绘制失败 */ }
+  }
+
+  h3(LL(D.ec_title));
+  kvRow(LL(D.ec_cv), "v" + rec.consent_form_version);
+  kvRow(LL(D.ec_pv), "v" + rec.pis_version);
+  kvRow(LL(D.ec_sm), LL(D.ec_sm_val));
+  kvRow(LL(D.ec_dt), rec.consent_datetime_local + " (" + rec.timezone + ")");
+  kvRow(LL(D.ec_au), rec.audit_id);
+  kvRow(LL(D.ec_copy), LL(D.ec_copy_val));
+
+  pages.push(cv);
+  const images = pages.map(c => {
+    const j = c.toDataURL("image/jpeg", 0.85).split(",")[1];
+    const bin = atob(j); const by = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
+    return { bytes: by, w: c.width, h: c.height };
+  });
+  return assembleImagePdf(images, Wpt, Hpt);
+}
+function assembleImagePdf(images, Wpt, Hpt) {
+  const chunks = []; let len = 0; const off = [];
+  const push = (x) => { const b = (x instanceof Uint8Array) ? x : latin1Bytes(x); chunks.push(b); len += b.length; };
+  const startObj = (n) => { off[n] = len; push(`${n} 0 obj\n`); };
+  const endObj = () => push("endobj\n");
+  push("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  startObj(1); push("<< /Type /Catalog /Pages 2 0 R >>\n"); endObj();
+  const P = images.length, imgIds = [], pageIds = [], contentIds = [];
+  let id = 3;
+  for (let i = 0; i < P; i++) { imgIds.push(id++); pageIds.push(id++); contentIds.push(id++); }
+  startObj(2); push(`<< /Type /Pages /Kids [${pageIds.map(i => i + " 0 R").join(" ")}] /Count ${P} >>\n`); endObj();
+  for (let i = 0; i < P; i++) {
+    const im = images[i];
+    startObj(imgIds[i]);
+    push(`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`);
+    push(im.bytes); push("\nendstream\n"); endObj();
+    const content = `q ${Wpt} 0 0 ${Hpt} 0 0 cm /Im0 Do Q`, cb = latin1Bytes(content);
+    startObj(pageIds[i]);
+    push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${Wpt} ${Hpt}] /Resources << /XObject << /Im0 ${imgIds[i]} 0 R >> >> /Contents ${contentIds[i]} 0 R >>\n`); endObj();
+    startObj(contentIds[i]);
+    push(`<< /Length ${cb.length} >>\nstream\n`); push(cb); push("\nendstream\n"); endObj();
+  }
+  const N = id, xrefStart = len;
+  let xref = `xref\n0 ${N}\n0000000000 65535 f \n`;
+  for (let n = 1; n < N; n++) xref += String(off[n] || 0).padStart(10, "0") + " 00000 n \n";
+  push(xref);
+  push(`trailer\n<< /Size ${N} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`);
+  let total = 0; for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total); let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
+}
+
+/* --------------------------------------------------------------------- *
+ *  用官方可填写 PDF 模板生成填好的同意书（pdf-lib，自托管本地库，不联网第三方）
+ *  模板：同目录 consent_template_en.pdf / consent_template_zh.pdf
+ *  Latin 文本 -> 真实可选中文字；含中文的姓名/自由文本 -> 渲染成图片盖到字段位置
+ *  （避免内嵌大字体）；手写签名盖到 signature 字段处；最后 flatten 扁平化。
+ * --------------------------------------------------------------------- */
+const _loadedScripts = {};
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (_loadedScripts[src]) return resolve();
+    const s = document.createElement("script");
+    s.src = src; s.onload = () => { _loadedScripts[src] = true; resolve(); };
+    s.onerror = () => reject(new Error("failed to load " + src));
+    document.head.appendChild(s);
+  });
+}
+const isLatin1 = (s) => /^[\x00-\xFF]*$/.test(String(s));
+function dataUrlToBytes(dataurl) {
+  const b64 = String(dataurl).split(",")[1] || "";
+  const bin = atob(b64); const by = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
+  return by;
+}
+// 把文本渲染成透明底 PNG（用于中文姓名/自由文本或任意非 Latin 值），按字段矩形大小
+function textToPngBytes(text, wPt, hPt) {
+  const scale = 3, multi = hPt > 26;
+  const cw = Math.max(1, Math.round(wPt * scale)), ch = Math.max(1, Math.round(hPt * scale));
+  const c = document.createElement("canvas"); c.width = cw; c.height = ch;
+  const x = c.getContext("2d");
+  const fpx = Math.min(multi ? 10 : hPt * 0.62, 12) * scale;
+  x.font = `${fpx}px "PingFang SC","Microsoft YaHei","Heiti SC",Helvetica,Arial,sans-serif`;
+  x.fillStyle = "#111"; x.textBaseline = multi ? "top" : "middle";
+  const pad = 2 * scale;
+  if (multi) {
+    const words = String(text).split(/(\s+)/); const lines = []; let cur = "";
+    const toks = String(text).match(/[A-Za-z0-9@._%+\-\/:]+|\s|[^\sA-Za-z0-9]/g) || [];
+    for (const tk of toks) { const t = cur + tk; if (x.measureText(t).width <= cw - 2 * pad || !cur) cur = t; else { lines.push(cur.replace(/\s+$/, "")); cur = tk === " " ? "" : tk; } }
+    if (cur) lines.push(cur);
+    let yy = pad, lh = fpx * 1.35;
+    for (const ln of lines) { if (yy + lh > ch) break; x.fillText(ln, pad, yy); yy += lh; }
+  } else {
+    x.fillText(String(text), pad, ch / 2);
+  }
+  const jpg = c.toDataURL("image/png").split(",")[1];
+  const bin = atob(jpg); const by = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
+  return by;
+}
+
+async function fillConsentPdfTemplate(rec, lang) {
+  await loadScriptOnce("lib/pdf-lib.min.js");
+  const PDFLib = window.PDFLib;
+  if (!PDFLib) throw new Error("pdf-lib not available");
+  const res = await fetch(`consent_template_${lang}.pdf`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`template consent_template_${lang}.pdf not found (${res.status})`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const doc = await PDFLib.PDFDocument.load(bytes);
+  const form = doc.getForm();
+  const a = rec.answers;
+
+  const checkOn = (name) => { try { form.getCheckBox(name).check(); } catch (e) { /* 字段不存在则忽略 */ } };
+  const cjkJobs = []; // {name, val}
+  const setText = (name, val) => {
+    if (val == null || val === "") return;
+    try {
+      const f = form.getTextField(name);
+      if (isLatin1(val)) f.setText(String(val));
+      else cjkJobs.push({ name, val: String(val) });
+    } catch (e) { /* 字段不存在则忽略 */ }
+  };
+
+  // A 节勾选
+  a.section_A_required.forEach((x, i) => { if (x.agreed) checkOn(`A${i + 1}`); });
+  // B/C/D + Level2 的 Yes/No
+  const yn = (prefix, arr) => arr.forEach(x => { if (x.answer === "yes") checkOn(`${prefix}${x.id}_yes`); else if (x.answer === "no") checkOn(`${prefix}${x.id}_no`); });
+  yn("B", a.section_B); yn("C", a.section_C); yn("C", a.section_C_level2); yn("D", a.section_D);
+  // E 节：本研究 = 第 1 条
+  checkOn("E1");
+  // H 节
+  a.section_H_declaration.forEach((x, i) => { if (x.agreed) checkOn(`H${i + 1}`); });
+
+  // 文本字段
+  setText("participant_name", rec.participant_name);
+  setText("participant_id", rec.subject_id);
+  setText("participant_datetime", rec.consent_datetime_local);
+  setText("level2_additional", a.level2_additional_restrictions);
+  setText("withdrawal_research_contact", RESEARCH_CONTACT.replace(/\n/g, " | "));
+  // 取得同意者 / 负责研究者：固定为 Lead Researcher，时间与参与者签署时刻一致
+  setText("researcher_name", "Jingyi Wan");
+  setText("researcher_role", "Lead Researcher");
+  setText("researcher_datetime", rec.consent_datetime_local);
+  setText("ec_consent_form_version", "v" + rec.consent_form_version);
+  setText("ec_pis_version", "v" + rec.pis_version);
+  setText("ec_signature_method", rec.signature_method);
+  setText("ec_record_datetime", rec.consent_datetime_local + " (" + rec.timezone + ")");
+  setText("ec_audit_id", rec.audit_id);
+  setText("ec_copy_method", "Automatic download in the participant's browser at submission");
+
+  // 采集需要“盖图”的字段矩形（签名 + 含中文的文本），必须在 flatten 之前
+  const stamps = [];
+  const fieldRectPage = (name) => {
+    const f = form.getField(name);
+    const w = f.acroField.getWidgets()[0];
+    const r = w.getRectangle();
+    const wdict = w.dict;
+    const pages = doc.getPages();
+    let page = pages[0];
+    outer: for (const p of pages) {
+      const annots = p.node.Annots && p.node.Annots();
+      if (!annots) continue;
+      const arr = annots.asArray ? annots.asArray() : [];
+      for (const el of arr) {
+        const obj = (el instanceof PDFLib.PDFRef) ? doc.context.lookup(el) : el;
+        if (obj === wdict) { page = p; break outer; }
+      }
+    }
+    return { page, rect: r };
+  };
+  if (rec.signature_png_dataurl) { try { stamps.push({ ...fieldRectPage("signature"), kind: "sig" }); } catch (e) { /* ignore */ } }
+  for (const job of cjkJobs) { try { stamps.push({ ...fieldRectPage(job.name), kind: "text", val: job.val }); } catch (e) { /* ignore */ } }
+
+  form.flatten();
+
+  for (const st of stamps) {
+    try {
+      if (st.kind === "sig") {
+        const png = await doc.embedPng(dataUrlToBytes(rec.signature_png_dataurl));
+        const asp = png.width / png.height;
+        let h = Math.min(32, st.rect.height * 1.8), wd = h * asp;
+        if (wd > st.rect.width) { wd = st.rect.width; h = wd / asp; }
+        // 垂直居中于签名框（超出部分上下均摊），避免签名整体压到上一行
+        const sy = st.rect.y + (st.rect.height - h) / 2;
+        st.page.drawImage(png, { x: st.rect.x + 2, y: sy, width: wd, height: h });
+      } else {
+        const png = await doc.embedPng(textToPngBytes(st.val, st.rect.width, st.rect.height));
+        st.page.drawImage(png, { x: st.rect.x, y: st.rect.y, width: st.rect.width, height: st.rect.height });
+      }
+    } catch (e) { console.warn("stamp failed", st, e); }
+  }
+  return await doc.save();  // Uint8Array
+}
+
+/* --------------------------------------------------------------------- *
+ *  2. 须知页
+ * --------------------------------------------------------------------- */
+function renderInstructions() {
+  $("instrPartLabel").textContent = t("part2_label");
+  $("instrHeader").textContent = t("instr_header");
+  formatInstrDoc($("instrText"), INSTRUCTION_TEXT[S.lang]);
+  $("readChkLbl").textContent = t("read_check");
+  $("btnRead").textContent = t("read_button");
+}
+
+$("btnRead").addEventListener("click", async () => {
+  if (!$("readChk").checked) { alert(t("need_read")); return; }
+  const ok = await openCamera();
+  if (!ok) { alert(t("cam_fail")); return; }
+  startCameraTest();
+});
+
+/* --------------------------------------------------------------------- *
+ *  摄像头
+ * --------------------------------------------------------------------- */
+async function openCamera(deviceId) {
+  // 优先横屏 16:9；指定 deviceId 时用所选摄像头，否则用前置默认
+  const videoCfg = { width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16 / 9 } };
+  if (deviceId) videoCfg.deviceId = { exact: deviceId }; else videoCfg.facingMode = "user";
+  if (S.camStream) { for (const tr of S.camStream.getTracks()) tr.stop(); S.camStream = null; }
+  try {
+    // 同时申请摄像头与麦克风（录制包含音频）
+    S.camStream = await navigator.mediaDevices.getUserMedia({ video: videoCfg, audio: true });
+  } catch (e) {
+    console.error("camera+mic failed, retrying video-only:", e);
+    // 麦克风被拒/不可用时回退为仅视频，避免完全无法录制
+    try {
+      S.camStream = await navigator.mediaDevices.getUserMedia({ video: videoCfg, audio: false });
+    } catch (e2) {
+      console.error(e2);
+      return false;
+    }
+  }
+  const track = S.camStream.getVideoTracks()[0];
+  const st = track.getSettings();
+  S.camSettings = { width: st.width || 1280, height: st.height || 720 };
+  S.camDeviceId = st.deviceId || deviceId || null;
+  const src = $("camSrc");
+  src.srcObject = S.camStream;
+  await src.play().catch(()=>{});
+  populateCameraSelect(); // 有权限后能拿到设备名，异步填充下拉
+  await initDetector();
+  return true;
+}
+
+// 摄像头选择下拉：仅当有多个视频输入设备时显示
+async function populateCameraSelect() {
+  const sel = $("camSelect"), row = $("camSelRow");
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+    sel.innerHTML = devs.map((d, i) =>
+      `<option value="${esc(d.deviceId)}"${d.deviceId === S.camDeviceId ? " selected" : ""}>${esc(d.label || `Camera ${i + 1}`)}</option>`).join("");
+    $("camSelLbl").textContent = S.lang === "zh" ? "摄像头" : "Camera";
+    row.style.display = devs.length > 1 ? "" : "none";
+  } catch (e) { row.style.display = "none"; }
+}
+$("camSelect").addEventListener("change", async () => {
+  const ok = await openCamera($("camSelect").value);
+  if (ok) startCameraTest(); else alert(t("cam_fail"));
+});
+
+async function initDetector() {
+  if (S.detectorReady) return; // 切换摄像头重开时无需重建检测器
+  try {
+    const { FaceDetector, FilesetResolver } = await import(`${MEDIAPIPE_BASE}/vision_bundle.mjs`);
+    const fileset = await FilesetResolver.forVisionTasks(`${MEDIAPIPE_BASE}/wasm`);
+    S.faceDetector = await FaceDetector.createFromOptions(fileset, {
+      baseOptions: {
+        modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+      },
+      runningMode: "VIDEO",
+    });
+    S.detectorReady = true;
+  } catch (e) {
+    console.warn("Face detector failed to load; falling back to manual alignment.", e);
+    S.detectorReady = false;
+  }
+}
+
+function ovalParams(w, h) {
+  return { ocx: OVAL.cx*w, ocy: OVAL.cy*h, orx: OVAL.rx*w, ory: OVAL.ry*h };
+}
+
+function faceInOval(face, w, h) {
+  if (!face) return false;
+  const cx = face.x + face.w/2, cy = face.y + face.h/2;
+  const { ocx, ocy, orx, ory } = ovalParams(w, h);
+  const inside = ((cx-ocx)/orx)**2 + ((cy-ocy)/ory)**2 <= 1.0;
+  const sizeOk = 0.7*orx <= face.w/2 && face.w/2 <= 1.6*orx;
+  return inside && sizeOk;
+}
+
+// 检测并返回镜像坐标系下的人脸框（与绘制坐标一致）
+let _detectTs = 0;  // 页面级单调递增时钟（微秒级步进）
+function detectMirrored(video, w, h, tsMs) {
+  if (!S.detectorReady) return null;
+  // MediaPipe 要求时间戳严格递增；video.mediaTime 在切换/重开摄像头流时会归零，
+  // 导致 "Packet timestamp mismatch" 每帧报错、检测失效。故忽略传入 tsMs，改用
+  // 只增不减的页面时钟，彻底避免时间戳倒退。
+  _detectTs = Math.max(_detectTs + 1, Math.round(performance.now()));
+  let res;
+  try { res = S.faceDetector.detectForVideo(video, _detectTs); }
+  catch { return null; }
+  if (!res || !res.detections || res.detections.length === 0) return null;
+  // 取最大人脸
+  let best = null;
+  for (const d of res.detections) {
+    const bb = d.boundingBox;
+    if (!best || bb.width*bb.height > best.boundingBox.width*best.boundingBox.height) best = d;
+  }
+  const bb = best.boundingBox;
+  // 6 个关键点（归一化坐标）：0/1 双眼、2 鼻尖、3 嘴、4/5 耳屏点；一并转换到镜像像素坐标
+  const kps = (best.keypoints || []).map(k => ({ x: w - k.x * w, y: k.y * h }));
+  // detectForVideo 返回的是原始（未镜像）坐标；转换到镜像绘制坐标
+  return { x: w - (bb.originX + bb.width), y: bb.originY, w: bb.width, h: bb.height, kps };
+}
+
+/* 正脸姿态粗检（仅摄像头检查步骤使用）：基于 FaceDetector 的关键点，
+ * 返回问题的文案 key（pose_up/pose_down/pose_turn/pose_tilt），正脸则返回 null。
+ * 阈值刻意宽松：只拦明显的仰头/低头/侧脸/歪头，不为难正常坐姿。 */
+function frontalPoseIssue(face) {
+  if (!face || !face.kps || face.kps.length < 4) return null; // 关键点缺失时不阻拦
+  const [e1, e2, nose, mouth] = face.kps;
+  const eyeMid = { x: (e1.x + e2.x) / 2, y: (e1.y + e2.y) / 2 };
+  const eyeDist = Math.hypot(e2.x - e1.x, e2.y - e1.y) || 1;
+  // 歪头：眼线相对水平的夹角
+  const rollDeg = Math.abs(Math.atan2(e2.y - e1.y, e2.x - e1.x) * 180 / Math.PI);
+  if (Math.min(rollDeg, 180 - rollDeg) > 14) return "pose_tilt";
+  // 左右转头：鼻尖到左右眼的水平距离对称性
+  const dL = Math.abs(nose.x - Math.min(e1.x, e2.x)), dR = Math.abs(Math.max(e1.x, e2.x) - nose.x);
+  if (Math.min(dL, dR) / Math.max(dL, dR) < 0.35) return "pose_turn";
+  // 仰头/低头：鼻尖在「眼线 -> 嘴」区间中的相对位置（正脸约 0.5–0.7）
+  const span = mouth.y - eyeMid.y;
+  if (span > eyeDist * 0.2) {
+    const t = (nose.y - eyeMid.y) / span;
+    if (t < 0.32) return "pose_up";
+    if (t > 0.85) return "pose_down";
+  }
+  return null;
+}
+
+function drawFrameMirrored(ctx, video, w, h) {
+  ctx.save();
+  ctx.translate(w, 0); ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, w, h);
+  ctx.restore();
+}
+
+function drawOvalGuide(ctx, w, h, aligned) {
+  const { ocx, ocy, orx, ory } = ovalParams(w, h);
+  ctx.lineWidth = Math.max(3, w/500);
+  ctx.strokeStyle = aligned ? "rgb(94,234,212)" : "rgb(255,107,129)";
+  ctx.beginPath(); ctx.ellipse(ocx, ocy, orx, ory, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.font = `bold ${Math.round(h/22)}px Helvetica`;
+  ctx.textAlign = "center";
+  ctx.fillText(aligned ? "Face OK" : "Move into the outline", ocx, ocy+ory+h/18);
+}
+
+function drawCountdown(ctx, w, h, text) {
+  const { ory } = ovalParams(w, h);
+  const { ocx, ocy } = ovalParams(w, h);
+  const size = Math.round(1.6 * ory);
+  ctx.font = `bold ${size}px Helvetica`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.lineWidth = Math.max(8, size/12); ctx.strokeStyle = "rgb(0,0,0)";
+  ctx.strokeText(text, ocx, ocy);
+  ctx.fillStyle = "rgb(255,255,255)"; ctx.fillText(text, ocx, ocy);
+  ctx.textBaseline = "alphabetic";
+}
+
+function drawRecBadge(ctx, w, h) {
+  const r = Math.max(10, w/90);
+  ctx.fillStyle = "rgb(255,107,129)";
+  ctx.beginPath(); ctx.arc(r+18, r+18, r, 0, Math.PI*2); ctx.fill();
+  ctx.font = `bold ${Math.round(h/22)}px Helvetica`;
+  ctx.textAlign = "left"; ctx.fillText("REC", r*2+26, r+26);
+}
+
+function sizeStage(stageId, w, h) {
+  const stage = $(stageId);
+  stage.style.aspectRatio = `${w} / ${h}`;
+}
+
+/* --------------------------------------------------------------------- *
+ *  3. 摄像头测试页
+ * --------------------------------------------------------------------- */
+let testAligned = 0;
+
+function startCameraTest() {
+  $("camPartLabel").textContent = t("part2_label");
+  $("camHeader").textContent = t("camtest_header");
+  $("camSub").textContent = t("camtest_sub");
+  $("testStatus").textContent = t("detecting");
+  $("btnStartRec").textContent = t("start_record");
+  $("btnStartRec").disabled = true;
+  show("screen-camtest");
+
+  const { width:w, height:h } = S.camSettings;
+  const canvas = $("testCanvas"), overlay = $("testOverlay");
+  canvas.width = overlay.width = w; canvas.height = overlay.height = h;
+  sizeStage("stageTest", w, h);
+  testAligned = 0;
+
+  if (!S.detectorReady) {
+    // 无检测：允许手动开始
+    $("testStatus").textContent = t("manual_ok");
+    $("testStatus").style.color = "#b3861f";
+    $("btnStartRec").disabled = false;
+  }
+  cancelRaf();
+  const ctx = canvas.getContext("2d"), octx = overlay.getContext("2d");
+  const src = $("camSrc");
+  function loop(now, meta) {
+    drawFrameMirrored(ctx, src, w, h);
+    octx.clearRect(0, 0, w, h);
+    let aligned = false;
+    if (S.detectorReady) {
+      const face = detectMirrored(src, w, h, meta ? meta.mediaTime*1000 : now);
+      const inOval = faceInOval(face, w, h);
+      const poseIssue = inOval ? frontalPoseIssue(face) : null; // 位置合适后再查姿态
+      aligned = inOval && !poseIssue;
+      drawOvalGuide(octx, w, h, aligned);
+      testAligned = aligned ? testAligned+1 : 0;
+      if (testAligned >= 10) {
+        $("testStatus").textContent = t("face_ok");
+        $("testStatus").style.color = "#0ca88f";
+        $("btnStartRec").disabled = false;
+      } else {
+        $("testStatus").textContent = poseIssue ? t(poseIssue) : t("move_in");
+        $("testStatus").style.color = "#b3861f";
+        $("btnStartRec").disabled = true;
+      }
+    } else {
+      drawOvalGuide(octx, w, h, false);
+    }
+    S.rafId = src.requestVideoFrameCallback(loop);
+  }
+  S.rafId = src.requestVideoFrameCallback(loop);
+}
+
+function cancelRaf() {
+  if (S.rafId != null) { try { $("camSrc").cancelVideoFrameCallback(S.rafId); } catch {} S.rafId = null; }
+}
+
+$("btnStartRec").addEventListener("click", () => {
+  cancelRaf();
+  S.emotionIdx = 0;
+  showRecordPage();
+});
+
+/* --------------------------------------------------------------------- *
+ *  4. 录制页
+ * --------------------------------------------------------------------- */
+function showRecordPage() {
+  show("screen-record");
+  const { width:w, height:h } = S.camSettings;
+  const canvas = $("recCanvas"), overlay = $("recOverlay");
+  canvas.width = overlay.width = w; canvas.height = overlay.height = h;
+  sizeStage("stageRec", w, h);
+  loadEmotion();
+}
+
+function loadEmotion() {
+  stopReview();
+  const emotion = EMOTIONS[S.emotionIdx];
+  $("recPartLabel").textContent = t("part2_label");
+  $("progressLbl").textContent = t("progress",
+    { i: S.emotionIdx+1, n: EMOTIONS.length, sid: S.subject.subject_id });
+  $("emotionLbl").textContent = t("target", { name: EMOTION_HINT[S.lang][emotion] || emotion });
+  $("descLbl").textContent = EMOTION_DESC[S.lang][emotion] || "";
+  S.countdownNum = null;
+  $("bigStatus").textContent = "";
+  $("bigStatus").style.color = "#e04c64";
+  $("hintLbl").textContent = t("hint_idle");
+  $("btnRow").innerHTML = "";
+  S.state = "idle";
+  startLivePreview();
+}
+
+function startLivePreview() {
+  const { width:w, height:h } = S.camSettings;
+  $("recCanvas").style.display = "block";
+  $("reviewVideo").style.display = "none";
+  const ctx = $("recCanvas").getContext("2d");
+  const octx = $("recOverlay").getContext("2d");
+  const src = $("camSrc");
+  cancelRaf();
+  function loop(now, meta) {
+    // 干净镜像帧（这一层会被录制）
+    drawFrameMirrored(ctx, src, w, h);
+    // 叠加层（不录制）
+    octx.clearRect(0, 0, w, h);
+    if (S.state === "idle" || S.state === "counting") {
+      const face = detectMirrored(src, w, h, meta ? meta.mediaTime*1000 : now);
+      drawOvalGuide(octx, w, h, faceInOval(face, w, h));
+      if (S.state === "counting" && S.countdownNum) drawCountdown(octx, w, h, S.countdownNum);
+    } else if (S.state === "recording") {
+      drawRecBadge(octx, w, h);
+      S.recordFrameTimes.push(meta ? meta.mediaTime : now/1000);
+    }
+    if (S.state !== "review") S.rafId = src.requestVideoFrameCallback(loop);
+  }
+  S.rafId = src.requestVideoFrameCallback(loop);
+}
+
+window.addEventListener("keydown", (e) => {
+  if (e.code !== "Space") return;
+  if (!$("screen-record").classList.contains("active")) return;
+  e.preventDefault();
+  if (S.state === "idle") beginCountdown();
+  else if (S.state === "recording") stopRecording();
+});
+
+function beginCountdown() {
+  S.state = "counting";
+  countdown(COUNTDOWN_SEC);
+}
+
+function countdown(n) {
+  if (S.state !== "counting") return;
+  if (n > 0) {
+    S.countdownNum = String(n);
+    $("bigStatus").textContent = "";
+    setTimeout(() => countdown(n-1), 1000);
+  } else {
+    S.countdownNum = null;
+    $("bigStatus").textContent = t("rec_badge");
+    $("bigStatus").style.color = "#e04c64";
+    startRecording();
+  }
+}
+
+function pickMime() {
+  // 优先 mp4 (H.264/AVC + AAC)：支持的浏览器直接出 mp4，无需转码；
+  // 不支持的自动回退到 webm (VP9/VP8 + Opus)。均声明音频编码以携带麦克风音轨。
+  const cands = [
+    ["video/mp4;codecs=avc1.640028,mp4a.40.2","mp4"], ["video/mp4;codecs=avc1.42E01E,mp4a.40.2","mp4"],
+    ["video/mp4;codecs=h264,aac","mp4"], ["video/mp4","mp4"],
+    ["video/webm;codecs=vp9,opus","webm"], ["video/webm;codecs=vp8,opus","webm"],
+    ["video/webm","webm"],
+  ];
+  for (const [m, ext] of cands) if (MediaRecorder.isTypeSupported(m)) return { mime:m, ext };
+  return { mime:"", ext:"webm" };
+}
+
+function startRecording() {
+  S.recordFrameTimes = [];
+  S.recChunks = [];
+  const stream = $("recCanvas").captureStream(); // 录制干净的镜像画布（无叠加层）
+  // 附加麦克风音轨，使成片包含同期音频
+  if (S.camStream) for (const at of S.camStream.getAudioTracks()) stream.addTrack(at);
+  const { mime, ext } = pickMime();
+  S.mimeExt = ext;
+  S.recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  S.recorder.ondataavailable = (e) => { if (e.data && e.data.size) S.recChunks.push(e.data); };
+  S.recorder.onstop = finalizeRecording;
+  S.recorder.start();
+  S.state = "recording";
+  $("hintLbl").textContent = t("hint_recording");
+}
+
+function stopRecording() {
+  if (S.recorder && S.recorder.state !== "inactive") S.recorder.stop();
+}
+
+function finalizeRecording() {
+  const times = S.recordFrameTimes.slice();
+  cancelRaf();
+  // 清掉叠加层残留的 REC 徽标，避免盖在回放画面上
+  const oc = $("recOverlay"); oc.getContext("2d").clearRect(0, 0, oc.width, oc.height);
+  if (S.recChunks.length === 0 || times.length === 0) {
+    S.state = "idle"; $("bigStatus").textContent = "";
+    alert(t("no_frames")); startLivePreview(); return;
+  }
+  const blob = new Blob(S.recChunks, { type: S.recorder.mimeType || "video/webm" });
+  const t0 = times[0];
+  const rel = times.map(x => x - t0);
+  let fps;
+  if (rel.length >= 2) fps = (rel.length - 1) / Math.max(rel[rel.length-1], 1e-3);
+  else fps = 30;
+  fps = Math.min(Math.max(fps, 1), 120);
+
+  S.cur = { blob, ext: S.mimeExt, timestamps: rel, fps };
+  S.state = "review";
+  $("bigStatus").textContent = t("done", { n: rel.length, fps: fps.toFixed(1) });
+  $("bigStatus").style.color = "#0ca88f";
+  showReview();
+}
+
+function showReview() {
+  const row = $("btnRow"); row.innerHTML = "";
+  const mk = (label, fn) => {
+    const b = document.createElement("button");
+    b.className = "secondary"; b.textContent = label; b.onclick = fn; row.appendChild(b);
+  };
+  mk(t("replay"), playRecorded);
+  mk(t("redo"), redo);
+  mk(t("keep_next"), accept);
+  $("hintLbl").textContent = t("hint_review");
+  playRecorded();
+}
+
+function playRecorded() {
+  stopReview();
+  if (!S.cur) return;
+  $("recCanvas").style.display = "none";
+  const v = $("reviewVideo");
+  v.style.display = "block";
+  v.className = ""; // 移除 hidden-src
+  S.reviewUrl = URL.createObjectURL(S.cur.blob);
+  v.src = S.reviewUrl;
+  v.muted = false; // 回放时开启声音，便于参与者确认音频
+  v.play().catch(()=>{});
+}
+
+function stopReview() {
+  const v = $("reviewVideo");
+  v.pause(); v.removeAttribute("src"); v.load();
+  v.className = "hidden-src";
+  if (S.reviewUrl) { URL.revokeObjectURL(S.reviewUrl); S.reviewUrl = null; }
+}
+
+function redo() {
+  stopReview();
+  S.cur = null;
+  loadEmotion();
+}
+
+function accept() {
+  stopReview();
+  const emotion = EMOTIONS[S.emotionIdx];
+  const clip = S.cur;
+  S.clips[emotion] = clip;
+  S.cur = null;
+  // 逐段上传：录完这段就在后台单独上传（不阻塞下一段录制）
+  if (UPLOAD_URL) enqueueUpload({ key: emotion, run: () => uploadClip(emotion, clip) });
+  S.emotionIdx += 1;
+  if (S.emotionIdx >= EMOTIONS.length) finish();
+  else loadEmotion();
+}
+
+/* --------------------------------------------------------------------- *
+ *  5. 结束 / 打包下载
+ * --------------------------------------------------------------------- */
+async function finish() {
+  cancelRaf();
+  if (S.camStream) S.camStream.getTracks().forEach(tk => tk.stop());
+  S.finishedAt = currentTimestamp();
+  $("btnDownload").textContent = t("download");
+  $("closeNote").style.display = "none";
+
+  if (UPLOAD_URL) {
+    // 上传期间：标题明确提示「仍在上传、请勿关闭」（不显示"已完成"的庆祝语，避免
+    // 参与者误以为结束而关闭页面中断上传）。上传结束后再切成庆祝标题。
+    $("finishTitle").textContent = t("finish_uploading_title");
+    $("finishTitle").style.color = "var(--warn)";
+    show("screen-finish");
+    enqueueUpload({ key: "__meta__", run: uploadMeta });  // 最后补传元数据
+    $("finishSaved").textContent = t("uploading");
+    await waitForUploads();
+    const fails = Object.values(S.uploadStatus).filter(v => v === "fail").length;
+    const oks = Object.values(S.uploadStatus).filter(v => v === "ok").length;
+    $("finishTitle").textContent = t("finish_title");     // 上传结束 -> 庆祝标题
+    $("finishTitle").style.color = "var(--good)";
+    if (fails) {
+      // 有失败：提示下载 zip 补发，不显示“可关闭”
+      $("finishSaved").textContent = t("upload_partial", { ok: oks, fail: fails });
+    } else {
+      // 全部上传成功：明确告知可关闭页面
+      $("finishSaved").textContent = t("upload_done");
+      $("closeNote").textContent = t("all_done_close");
+      $("closeNote").style.display = "block";
+      $("btnDownload").textContent = t("download_backup");
+    }
+  } else {
+    // 未配置云端上传：必须本地下载并发给研究者
+    $("finishTitle").textContent = t("finish_title");
+    $("finishTitle").style.color = "var(--good)";
+    $("finishSaved").textContent = t("finish_saved");
+    show("screen-finish");
+  }
+}
+
+$("btnDownload").addEventListener("click", buildAndDownloadZip);
+
+function currentTimestamp() {
+  const p = (n) => String(n).padStart(2, "0");
+  const d = new Date();
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+/* ---- 逐段上传到 Google Drive（经 Apps Script 中转，凭证不下发浏览器） ---- */
+function enqueueUpload(task) { S.uploadQueue.push(task); processUploadQueue(); }
+
+async function processUploadQueue() {
+  if (S.uploading) return;
+  S.uploading = true;
+  while (S.uploadQueue.length) {
+    const task = S.uploadQueue.shift();
+    try { await task.run(); S.uploadStatus[task.key] = "ok"; }
+    catch (e) { console.error("upload failed:", task.key, e); S.uploadStatus[task.key] = "fail"; }
+    updateUploadInfo();
+  }
+  S.uploading = false;
+}
+
+function waitForUploads() {
+  return new Promise((resolve) => {
+    const chk = () => (!S.uploading && S.uploadQueue.length === 0) ? resolve() : setTimeout(chk, 200);
+    chk();
+  });
+}
+
+function updateUploadInfo() {
+  const el = $("uploadInfo");
+  if (!el || !UPLOAD_URL) return;
+  const vals = Object.values(S.uploadStatus);
+  const ok = vals.filter(v => v === "ok").length;
+  const fail = vals.filter(v => v === "fail").length;
+  const pend = S.uploadQueue.length + (S.uploading ? 1 : 0);
+  el.textContent = `☁ ${t("up_ok")}: ${ok}` +
+    (fail ? `  ${t("up_fail")}: ${fail}` : "") +
+    (pend ? `  ${t("up_pending")}: ${pend}` : "");
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = reject;
+    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.readAsDataURL(blob);
+  });
+}
+
+const UPLOAD_RETRIES = 2;   // 失败后额外重试次数（共尝试 1 + 2 = 3 次）
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function postJSON(payload) {
+  const body = JSON.stringify(payload);
+  let lastErr;
+  for (let attempt = 0; attempt <= UPLOAD_RETRIES; attempt++) {
+    try {
+      // text/plain 为 CORS「简单请求」，不触发预检；Apps Script 也无法处理 OPTIONS。
+      const res = await fetch(UPLOAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body,
+      });
+      const data = await res.json();
+      if (!data || !data.ok) throw new Error(data && data.error || "upload failed");
+      return data;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < UPLOAD_RETRIES) {
+        console.warn(`upload attempt ${attempt + 1} failed, retrying…`, e);
+        await sleep(1000 * (attempt + 1));   // 递增退避：1s、2s
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// 分块经 Apps Script 中转上传：浏览器把视频切成 <50MB 的块（base64）发给 Apps Script，
+// 由 Apps Script 在【服务器侧】PUT 到 Google 的 resumable 会话。这样既绕开 Apps Script
+// 的 50MB 单请求上限，又完全避开浏览器直传 Google 时的 CORS 限制。
+const RELAY_CHUNK = 16 * 1024 * 1024;   // 16MB/块（base64 ≈ 21MB，单请求 < 50MB；须为 256KB 整数倍）
+
+async function putViaRelay(sessionUrl, blob) {
+  const total = blob.size;
+  let offset = 0;
+  while (offset < total) {
+    const end = Math.min(offset + RELAY_CHUNK, total);
+    const chunkB64 = await blobToBase64(blob.slice(offset, end));
+    // postJSON 自带重试；同一 Content-Range 重发是幂等的（Google 按字节区间去重）。
+    const r = await postJSON({
+      type: "resumable_chunk",
+      subject_id: S.subject.subject_id,   // doPost 顶层对所有请求都要求 subject_id
+      session_url: sessionUrl,
+      start: offset,
+      total,
+      chunk_b64: chunkB64,
+    });
+    if (r.done) return;   // 最后一块返回 done=true
+    offset = end;
+  }
+}
+
+function clipTimestampsCsv(clip) {
+  let csv = "frame,time_sec\n";
+  clip.timestamps.forEach((x, i) => { csv += `${i},${x.toFixed(6)}\n`; });
+  return csv;
+}
+
+async function uploadClip(emotion, clip) {
+  const name = `${emotion}.${clip.ext}`;
+  const mime = clip.blob.type || "application/octet-stream";
+  // 首选：可续传直传（绕开 50MB 上限，支持 4K）。
+  let sessionUrl = null;
+  try {
+    const init = await postJSON({
+      type: "resumable_init",
+      subject_id: S.subject.subject_id,
+      name, mime, size: clip.blob.size,
+    });
+    sessionUrl = init.session_url;
+  } catch (e) {
+    console.warn("resumable_init failed; falling back to base64 clip upload (small clips only):", e);
+  }
+  if (sessionUrl) {
+    await putViaRelay(sessionUrl, clip.blob);
+    // 视频上传成功后单独补传时间戳（很小）
+    await postJSON({ type: "timestamps", subject_id: S.subject.subject_id, emotion, timestamps_csv: clipTimestampsCsv(clip) });
+    return;
+  }
+  // 回退：旧的 base64-through-Apps-Script 路径（仅 <~50MB 的片段能成功）。
+  const b64 = await blobToBase64(clip.blob);
+  await postJSON({
+    type: "clip",
+    subject_id: S.subject.subject_id,
+    emotion,
+    video_name: name,
+    mime,
+    video_b64: b64,
+    timestamps_csv: clipTimestampsCsv(clip),
+  });
+}
+
+async function uploadMeta() {
+  const { meta, indexCsv } = buildMeta(S.finishedAt || currentTimestamp());
+  await postJSON({
+    type: "meta",
+    subject_id: S.subject.subject_id,
+    metadata_json: JSON.stringify(meta, null, 2),
+    index_csv: indexCsv,
+  });
+}
+
+/* 元数据/索引构建（zip 下载与云端上传共用，保证两边内容一致） */
+function buildMeta(finishedAt) {
+  const files = {};
+  for (const e of EMOTIONS) if (S.clips[e]) files[e] = `${e}.${S.clips[e].ext}`;
+  const meta = {
+    ...S.subject,
+    emotions: EMOTIONS,
+    camera_resolution: [S.camSettings.width, S.camSettings.height],
+    audio_recorded: !!(S.camStream && S.camStream.getAudioTracks().length),
+    recorder_mime: S.recorder ? S.recorder.mimeType : "",
+    user_agent: navigator.userAgent,
+    note_fps: "实际帧率按每段录制的真实呈现时间戳（mediaTime）计算，见各 .timestamps.csv；视频本身按浏览器编码的可变帧率保存，播放速度正确。",
+    consent: S.consentRecord ? {
+      consent_form_version: S.consentRecord.consent_form_version,
+      pis_version: S.consentRecord.pis_version,
+      audit_id: S.consentRecord.audit_id,
+      consent_datetime_iso: S.consentRecord.consent_datetime_iso,
+      display_language: S.consentRecord.display_language,
+      authoritative_language: "en",
+      folder: "../consent/",
+    } : null,
+    files, finished_at: finishedAt,
+  };
+  const header = ["subject_id","name","age","gender","nationality","created_at","finished_at","n_emotions"];
+  const row = [S.subject.subject_id, S.subject.name, S.subject.age, S.subject.gender,
+               S.subject.nationality, S.subject.created_at, finishedAt, Object.keys(files).length];
+  const indexCsv = header.join(",") + "\n" + row.map(csvCell).join(",") + "\n";
+  return { meta, files, indexCsv };
+}
+
+async function buildAndDownloadZip() {
+  const enc = new TextEncoder();
+  const sid = S.subject.subject_id;
+  const entries = [];
+
+  // 录像与元数据放 <subject_id>/recordings/
+  for (const emotion of EMOTIONS) {
+    const clip = S.clips[emotion];
+    if (!clip) continue;
+    const buf = new Uint8Array(await clip.blob.arrayBuffer());
+    entries.push({ name: `${sid}/recordings/${emotion}.${clip.ext}`, data: buf });
+    // 逐帧时间戳
+    let csv = "frame,time_sec\n";
+    clip.timestamps.forEach((x, i) => { csv += `${i},${x.toFixed(6)}\n`; });
+    entries.push({ name: `${sid}/recordings/${emotion}.timestamps.csv`, data: enc.encode(csv) });
+  }
+  const { meta, indexCsv } = buildMeta(S.finishedAt || currentTimestamp());
+  entries.push({ name: `${sid}/recordings/metadata.json`, data: enc.encode(JSON.stringify(meta, null, 2)) });
+  entries.push({ name: `${sid}/recordings/index.csv`, data: enc.encode(indexCsv) });
+
+  // 知情同意记录放 <subject_id>/consent/（与录像分开；时间戳命名做本地兜底）
+  if (S.consentRecord) {
+    const rec = S.consentRecord, st = rec.stamp || currentTimestamp();
+    entries.push({ name: `${sid}/consent/consent_${st}.json`, data: enc.encode(JSON.stringify(rec, null, 2)) });
+    // 参与者当次看到的 PIS 正文（中英两版留档）
+    entries.push({ name: `${sid}/consent/pis_${st}_en.txt`, data: enc.encode(pisTextForLang("en")) });
+    entries.push({ name: `${sid}/consent/pis_${st}_zh.txt`, data: enc.encode(pisTextForLang("zh")) });
+    // 英文（权威版）始终保存
+    entries.push({ name: `${sid}/consent/consent_${st}_en.html`, data: enc.encode(consentToHtml(rec, "en")) });
+    if (S.consentPdfEn) entries.push({ name: `${sid}/consent/consent_${st}_en.pdf`, data: S.consentPdfEn });
+    // 中文显示时额外保存中文版本
+    if (rec.display_language === "zh") {
+      entries.push({ name: `${sid}/consent/consent_${st}_zh.html`, data: enc.encode(consentToHtml(rec, "zh")) });
+      if (S.consentPdfZh) entries.push({ name: `${sid}/consent/consent_${st}_zh.pdf`, data: S.consentPdfZh });
+    }
+    if (rec.signature_png_dataurl) {
+      const b64 = rec.signature_png_dataurl.split(",")[1] || "";
+      const bin = atob(b64); const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      entries.push({ name: `${sid}/consent/signature_${st}.png`, data: bytes });
+    }
+  }
+
+  const zip = buildZipStore(entries);
+  const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = `${sid}.zip`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function csvCell(v) {
+  v = String(v ?? "");
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v;
+}
+
+/* ---- 极简 ZIP（store，无压缩；webm 已压缩，够用） ---- */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function buildZipStore(entries) {
+  const enc = new TextEncoder();
+  const chunks = [], central = [];
+  let offset = 0;
+  const u16 = (n) => new Uint8Array([n & 255, (n>>8)&255]);
+  const u32 = (n) => new Uint8Array([n&255, (n>>8)&255, (n>>16)&255, (n>>>24)&255]);
+
+  for (const e of entries) {
+    const name = enc.encode(e.name);
+    const crc = crc32(e.data);
+    const size = e.data.length;
+    const local = concat([
+      u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+      u32(crc), u32(size), u32(size), u16(name.length), u16(0), name, e.data,
+    ]);
+    chunks.push(local);
+    central.push(concat([
+      u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+      u32(crc), u32(size), u32(size), u16(name.length), u16(0), u16(0), u16(0), u16(0),
+      u32(0), u32(offset), name,
+    ]));
+    offset += local.length;
+  }
+  const cd = concat(central);
+  const end = concat([
+    u32(0x06054b50), u16(0), u16(0), u16(entries.length), u16(entries.length),
+    u32(cd.length), u32(offset), u16(0),
+  ]);
+  return concat([...chunks, cd, end]);
+}
+function concat(arrs) {
+  let len = 0; for (const a of arrs) len += a.length;
+  const out = new Uint8Array(len); let o = 0;
+  for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+
+/* --------------------------------------------------------------------- *
+ *  初始化：欢迎页 -> PIS -> 同意书 -> 过渡页 -> 注册 -> 录制
+ * --------------------------------------------------------------------- */
+renderLoginLabels();
+updateLangButtons();
+initConsentState();
+renderWelcome();
+renderPis();
+show("screen-welcome");
+</script>
+</body>
+</html>
