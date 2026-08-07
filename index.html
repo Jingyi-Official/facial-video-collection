@@ -134,6 +134,37 @@
   .consent-item .qnum { color: var(--accent-bright); font-weight: 600; margin-right: 6px; }
   .consent-tick { display: flex; align-items: flex-start; gap: 10px; }
   .consent-tick input { margin-top: 4px; flex: none; }
+  /* 一键全选（仅用于 A 节与 H 节的必选勾选项） */
+  .tick-all { display: flex; align-items: center; gap: 10px; margin: 8px 0 12px; cursor: pointer;
+              font-size: 14.5px; font-weight: 600; color: var(--accent-deep);
+              background: rgba(125,140,255,.10); border: 1px dashed rgba(91,95,166,.45);
+              border-radius: 10px; padding: 10px 14px; transition: background .15s; }
+  .tick-all:hover { background: rgba(125,140,255,.18); }
+  .tick-all input { flex: none; }
+
+  /* ---- 手机/平板专用（粗指针 + 无悬停）：电脑端（含窄窗口）完全不命中 ---- */
+  .rotate-hint { display: none; font-size: 14px; color: var(--warn); text-align: center; margin: 0 0 8px; }
+  @media (pointer: coarse) and (hover: none) {
+    .screen { padding: 16px 12px; }
+    h1 { font-size: 24px; margin-bottom: 16px; }
+    h2 { font-size: 21px; }
+    .emotion { font-size: 28px; }
+    .desc, .big-note { font-size: 16px; }
+    .lang-btns { position: static; justify-content: center; margin: 0 0 10px; }
+    label.field { flex-direction: column; align-items: stretch; gap: 6px; }
+    label.field > span { width: auto; }
+    .instr-text { height: 58vh; padding: 14px; }
+    .consent-item { padding: 12px; }
+    .consent-yn { gap: 16px; }
+    .video-stage canvas, .video-stage video { max-height: 46vh; }
+    button.primary, button.secondary { padding: 14px 20px; font-size: 17px; }  /* 加大触点面积 */
+    .btn-row { gap: 8px; }
+    button.tap-rec { width: 100%; max-width: 420px; padding: 18px 24px; font-size: 20px; border-radius: 12px; }
+    button.tap-rec.stop { background: linear-gradient(135deg, #ef6a7e, #c9364f); }
+  }
+  @media (pointer: coarse) and (hover: none) and (orientation: portrait) {
+    .rotate-hint { display: block; }
+  }
   .consent-yn { display: flex; gap: 22px; margin-top: 10px; }
   .consent-yn label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 15px; }
   .consent-info { background: rgba(125,140,255,.10); border: 1px solid rgba(91,95,166,.35); border-radius: 10px;
@@ -148,16 +179,27 @@
   .field-inline input[type=text] { flex: 1; min-width: 220px; }
   textarea.consent-free { width: 100%; min-height: 70px; border-radius: 8px; border: 1px solid var(--line-strong);
                           background: var(--surface-2); color: var(--text); padding: 8px 10px; resize: vertical; }
+
+  /* ---- 同意完成过渡页：视觉重点放在“开始数据收集”按钮，避免被误认为已结束 ---- */
+  .cd-badge { display: inline-block; font-size: 14px; font-weight: 600; color: var(--good);
+              background: rgba(12,168,143,.10); border: 1px solid rgba(12,168,143,.35);
+              border-radius: 999px; padding: 5px 14px; margin-bottom: 20px; }
+  button.primary.cta {
+    font-size: 21px; font-weight: 700; padding: 18px 46px; border-radius: 12px;
+    box-shadow: 0 6px 26px rgba(125,140,255,.45), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .cd-warn { font-size: 15px; color: var(--warn); margin: 22px 0 0; }
 </style>
 </head>
 <body>
 <div id="app">
   <!-- 2b. 同意完成 -> 开始数据收集（过渡页） -->
   <section class="screen" id="screen-consent-done">
-    <div class="center-box" style="max-width:660px;text-align:center">
-      <h1 id="cdTitle" style="color:var(--good)"></h1>
-      <p class="big-note" id="cdMsg" style="margin:0 auto 18px"></p>
-      <button class="primary" id="btnConsentDone"></button>
+    <div class="center-box" style="max-width:680px;text-align:center">
+      <div class="cd-badge" id="cdTitle"></div>
+      <p class="big-note" id="cdMsg" style="margin:0 auto 22px"></p>
+      <button class="primary cta" id="btnConsentDone"></button>
+      <p class="cd-warn" id="cdWarn"></p>
     </div>
   </section>
 
@@ -186,6 +228,13 @@
       <p class="big-note" id="welcomeIntro" style="margin:0 auto 18px"></p>
       <div class="consent-info consent-readonly" id="welcomePart1"></div>
       <div class="consent-info consent-readonly" id="welcomePart2"></div>
+      <div class="consent-info" id="resumeBox" style="display:none">
+        <div id="resumeText"></div>
+        <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="primary" id="btnResume"></button>
+          <button class="secondary" id="btnDiscard"></button>
+        </div>
+      </div>
       <div style="text-align:center;margin-top:22px"><button class="primary" id="btnWelcomeStart"></button></div>
       <div class="lang-btns inline">
         <button type="button" data-lang="zh">中文</button>
@@ -245,6 +294,7 @@
     <div class="video-holder"><div class="video-stage" id="stageTest">
       <canvas id="testCanvas"></canvas><canvas id="testOverlay"></canvas>
     </div></div>
+    <div class="rotate-hint" data-rotate></div>
     <div class="status" id="testStatus" style="color:var(--warn)"></div>
     <button class="primary" id="btnStartRec" disabled></button>
   </section>
@@ -260,6 +310,7 @@
       <video id="reviewVideo" class="hidden-src" playsinline muted loop></video>
       <canvas id="recOverlay"></canvas>
     </div></div>
+    <div class="rotate-hint" data-rotate></div>
     <div class="status" id="bigStatus" style="color:var(--rec)"></div>
     <div class="hint" id="hintLbl"></div>
     <div class="hint" id="uploadInfo" style="color:var(--good)"></div>
@@ -287,7 +338,8 @@
 <script type="module">
 // 注意：人脸检测库（第三方）改为「进入摄像头页时才动态加载」，
 // 使登录 / PIS / 同意书等页面零第三方请求（符合伦理附录对同意/录制页的建议）。
-const MEDIAPIPE_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+// 人脸检测库与模型随页面本地部署：参与者运行时不向 jsDelivr / Google Storage 发起任何请求
+const MEDIAPIPE_BASE = "./lib/mediapipe";
 
 /* --------------------------------------------------------------------- *
  *  配置（与 record.py 对齐）
@@ -348,6 +400,25 @@ const EMOTION_DESC = {
 };
 
 const COUNTDOWN_SEC = 3;
+const DROP_WARN_RATIO = 0.05;   // 丢帧比例超过 5% 时提示参与者重录
+
+/* ---- 录制码率（手机与电脑一致） ----------------------------------------
+   浏览器对 MediaRecorder 的默认视频码率与分辨率基本无关（Chromium 约 2.5 Mbps），
+   在 1080p 以上会明显压坏皮肤纹理与眨眼/微表情等低对比细节，因此这里显式指定。
+   目标码率 = 宽 × 高 × 帧率 × BPP（bits per pixel）。
+   BPP 参考：流媒体 ~0.07；高质量存档 ~0.15；0.25 属视觉近无损档（本项目取值）。
+   注意：码率直接决定文件大小，1080p30 ≈ 15 Mbps ≈ 1.9 MB/s，4K30 ≈ 62 Mbps ≈ 7.8 MB/s。
+   若上传带宽或存储成本吃紧，只需调小 VIDEO_BPP 或 VIDEO_BITRATE_MAX 这两个常量。 */
+const VIDEO_BPP = 0.25;
+const VIDEO_BITRATE_MIN = 8e6;     // 低分辨率下的下限
+const VIDEO_BITRATE_MAX = 120e6;   // 上限：超出后编码器多半也无法维持
+const AUDIO_BITRATE = 192e3;       // 语音/环境音在 192 kbps 已属透明
+
+// 依据实际录制分辨率与帧率计算目标码率（浏览器/硬件编码器可能再往下钳制）
+function targetVideoBitrate(w, h, fps) {
+  const bps = w * h * fps * VIDEO_BPP;
+  return Math.round(Math.min(Math.max(bps, VIDEO_BITRATE_MIN), VIDEO_BITRATE_MAX));
+}
 const OVAL = { cx:0.5, cy:0.46, rx:0.20, ry:0.30 };
 
 // 每段录完自动上传到 Google Drive 的 Apps Script Web App 地址。
@@ -481,10 +552,19 @@ const TR = {
     progress:"进度 {i} / {n}    受试者: {sid}", target:"目标项目：{name}",
     hint_idle:"按【空格键】开始 3 秒倒计时并录制；再次按【空格键】停止。",
     hint_recording:"录制中... 再次按【空格键】停止。",
+    hint_idle_tap:"点击下方【开始录制】，3 秒倒计时后开始；再点【停止录制】结束。",
+    hint_recording_tap:"录制中… 点击下方【停止录制】结束。",
+    tap_start:"● 开始录制 / Start", tap_stop:"■ 停止录制 / Stop", tap_counting:"倒计时中…",
+    rotate_hint:"建议横屏握持手机，并让屏幕保持常亮。",
     hint_review:"请回放确认；可重录，或保留并进入下一个项目。",
-    rec_badge:"● 录制中 REC", done:"录制完成（{n} 帧 / {fps} fps），请回放确认",
+    rec_badge:"● 录制中 REC", done:"录制完成（{n} 帧 / {fps} fps / {w}×{h}），请回放确认",
     no_frames:"未捕获到画面，请重试。",
     replay:"▶ 回放 / Replay", redo:"↺ 重新录制 / Re-record", keep_next:"✓ 保留并继续 / Keep & Next",
+    drop_warn:"⚠ 本段有 {n} 帧未被采集到（约 {p}%），可能是设备卡顿。建议点【重新录制】再录一次。",
+    resume_found:"检测到本机上有一次未完成的录制（编号 {sid}，已完成 {n} / {total} 段）。您可以从中断处继续，无需重新签署同意书。",
+    resume_go:"继续未完成的录制 ›",
+    resume_discard:"放弃并重新开始",
+    resume_discard_confirm:"将删除本机暂存的未完成录制（含已录片段），且无法恢复。确定要放弃吗？",
     finish_title:"录制完成，感谢您的参与！",
     finish_uploading_title:"正在上传，请勿关闭此页面…",
     finish_saved:"点击下方按钮下载数据压缩包（包含所有视频、逐帧时间戳与元数据）。",
@@ -496,9 +576,10 @@ const TR = {
     welcome_start:"开始 / Start",
     part1_label:"第一部分 / Part 1 of 2 · 知情同意 Consent",
     part2_label:"第二部分 / Part 2 of 2 · 数据收集 Data collection",
-    cd_title:"知情同意已完成 ✓",
-    cd_msg:"感谢您的同意。现在进入【第二部分 · 数据收集】。接下来请填写少量基本信息，然后按提示逐个做出面部表情并录制短视频。",
-    cd_continue:"开始数据收集 / Start data collection",
+    cd_title:"第一部分 · 知情同意已完成 ✓",
+    cd_msg:"接下来是【第二部分 · 数据收集】：先填写少量基本信息，然后按提示逐个做出面部表情并录制短视频。请点击下方按钮继续。",
+    cd_continue:"开始数据收集 / Start data collection ›",
+    cd_warn:"⚠ 请勿关闭本页面——完成第二部分后，本次参与才算结束。",
     up_ok:"已上传", up_fail:"失败", up_pending:"待传",
     uploading:"正在上传到云端 Drive，请稍候…",
     upload_done:"全部数据已上传到云端 ✓",
@@ -526,10 +607,19 @@ const TR = {
     progress:"Item {i} / {n}    Subject: {sid}", target:"Target: {name}",
     hint_idle:"Press [SPACE] to start a 3s countdown and record; press [SPACE] again to stop.",
     hint_recording:"Recording... press [SPACE] again to stop.",
+    hint_idle_tap:"Tap “Start recording” below; recording begins after a 3s countdown. Tap “Stop recording” to end.",
+    hint_recording_tap:"Recording… tap “Stop recording” below to end.",
+    tap_start:"● Start recording", tap_stop:"■ Stop recording", tap_counting:"Counting down…",
+    rotate_hint:"Please hold the phone in landscape and keep the screen awake.",
     hint_review:"Please review; re-record, or keep and go to the next item.",
-    rec_badge:"● REC", done:"Done ({n} frames / {fps} fps). Please review.",
+    rec_badge:"● REC", done:"Done ({n} frames / {fps} fps / {w}×{h}). Please review.",
     no_frames:"No frames captured. Please try again.",
     replay:"▶ Replay", redo:"↺ Re-record", keep_next:"✓ Keep & Next",
+    drop_warn:"⚠ {n} frame(s) were not captured in this clip (about {p}%), likely due to device lag. Please tap “Re-record” and try again.",
+    resume_found:"An unfinished recording session was found on this device ({sid}, {n} of {total} clips completed). You can continue where you left off — no need to sign the consent form again.",
+    resume_go:"Continue the unfinished session ›",
+    resume_discard:"Discard and start over",
+    resume_discard_confirm:"This will delete the unfinished session stored on this device, including the clips already recorded. This cannot be undone. Discard it?",
     finish_title:"All done. Thank you for your participation!",
     finish_uploading_title:"Uploading… please do not close this page.",
     finish_saved:"Click below to download the data archive (all videos, per-frame timestamps and metadata).",
@@ -541,9 +631,10 @@ const TR = {
     welcome_start:"Start",
     part1_label:"Part 1 of 2 · Informed consent",
     part2_label:"Part 2 of 2 · Data collection",
-    cd_title:"Consent completed ✓",
-    cd_msg:"Thank you. We will now begin Part 2 · Data collection. Next, please enter a few basic details, then record short facial-expression clips as prompted.",
-    cd_continue:"Start data collection",
+    cd_title:"Part 1 · Consent completed ✓",
+    cd_msg:"Next is Part 2 · Data collection: enter a few basic details, then record short facial-expression clips as prompted. Click the button below to continue.",
+    cd_continue:"Start data collection ›",
+    cd_warn:"⚠ Please don't close this page — your participation is complete only after Part 2.",
     up_ok:"uploaded", up_fail:"failed", up_pending:"pending",
     uploading:"Uploading to cloud Drive, please wait…",
     upload_done:"All data uploaded to the cloud ✓",
@@ -1054,10 +1145,15 @@ const S = {
   camSettings: { width:0, height:0 },
   rafId: null,
   recordFrameTimes: [],
+  recordPresented: [],     // 与 recordFrameTimes 一一对应的 presentedFrames 计数（用于丢帧检测）
   recorder: null,
+  recSettings: null,       // 本次录制实际采用的编码参数（码率等）
   recChunks: [],
   reviewUrl: null,
   uploadQueue: [], uploading: false, uploadStatus: {}, finishedAt: null,
+  allDone: false,          // 全部完成（可安全关闭页面）
+  pendingResume: null,     // 启动时探测到的未完成会话
+  resumeIdx: null,         // 续录时从第几段接着录
   mimeExt: "webm",
   consent: null,          // 收集中的同意选择
   consentRecord: null,    // 提交后生成的完整同意记录（json/html/签名）
@@ -1070,6 +1166,14 @@ const t = (key, kw) => {
   if (kw) for (const k in kw) s = s.replace(`{${k}}`, kw[k]);
   return s;
 };
+
+/* 仅手机/平板启用移动端适配；电脑端（含触屏笔记本的鼠标模式）行为保持完全不变 */
+const IS_MOBILE = (() => {
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPod|iPad/i.test(ua)) return true;
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return true;   // iPadOS 会伪装成 Mac
+  return window.matchMedia("(pointer: coarse) and (hover: none)").matches;
+})();
 
 function show(screen) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
@@ -1100,6 +1204,7 @@ function setLang(lang) {
   renderWelcome();
   renderPis();
   renderLoginLabels();
+  renderResumeBox();
   // 若正处于同意书页面，随语言重绘（英文为准，中文为参考翻译）
   if ($("screen-consent").classList.contains("active")) { persistStepSoft(); renderConsentStep(); }
 }
@@ -1122,6 +1227,7 @@ $("btnSubmit").addEventListener("click", () => {
   S.subject.gender = $("fGender").value;
   S.subject.nationality = $("fNat").value.trim();
   S.subject.language = S.lang;
+  saveSessionMeta();
   renderInstructions();
   show("screen-instr");
 });
@@ -1199,6 +1305,7 @@ function renderConsentDone() {
   $("cdTitle").textContent = t("cd_title");
   $("cdMsg").textContent = t("cd_msg");
   $("btnConsentDone").textContent = t("cd_continue");
+  $("cdWarn").textContent = t("cd_warn");
 }
 $("btnConsentDone").addEventListener("click", () => showRegistration());
 $("btnPisNext").addEventListener("click", () => {
@@ -1231,6 +1338,29 @@ function tickItem(idx, text, checked, num) {
     <span class="q">${num != null ? `<span class="qnum">${num}.</span>` : ""}${esc(text)}</span></label></div>`;
 }
 
+// 一键全选条（只出现在 A 节与 H 节这类“全部必选”的勾选组，B/C/D 的 Yes/No 项不提供）
+function tickAllBar(n) {
+  const zh = S.lang === "zh";
+  return `<label class="tick-all"><input type="checkbox" id="tickAll"/><span>${esc(zh
+    ? `一键全选以下 ${n} 项（也可逐项勾选；请先阅读各条目）`
+    : `Tick all ${n} items below (you can also tick them individually; please read each item first)`)}</span></label>`;
+}
+
+// 绑定全选框与各条目的双向联动（含部分勾选时的 indeterminate 状态）
+function setupTickAll() {
+  const master = $("tickAll");
+  if (!master) return;
+  const items = [...document.querySelectorAll('#consentBody input[data-tick]')];
+  const sync = () => {
+    const n = items.filter(el => el.checked).length;
+    master.checked = n === items.length && n > 0;
+    master.indeterminate = n > 0 && n < items.length;
+  };
+  master.addEventListener("change", () => { items.forEach(el => { el.checked = master.checked; }); sync(); });
+  items.forEach(el => el.addEventListener("change", sync));
+  sync();
+}
+
 function renderConsentStep() {
   const step = CONSENT_STEPS[S.consentStep];
   const zh = S.lang === "zh";
@@ -1251,6 +1381,7 @@ function renderConsentStep() {
     html += infoBox(L(CONSENT_DOC.important));
     html += `<div class="consent-section-title">${esc(L(CONSENT_TITLES.A))}</div>`;
     html += `<div class="consent-section-intro">${esc(L(CONSENT_TITLES.A_intro))}</div>`;
+    html += tickAllBar(CONSENT_A.length);
     CONSENT_A.forEach((o, i) => { html += tickItem(i, L(o), !!S.consent.A[i], i + 1); }); // 编号 1–14，与导出文档一致（B 节从 15 接续）
   } else if (step === "B") {
     html += `<div class="consent-section-title">${esc(L(CONSENT_TITLES.B))}</div>`;
@@ -1284,6 +1415,7 @@ function renderConsentStep() {
     html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_DOC.G_title))}</div>`;
     html += `<div class="consent-section-intro">${esc(L(CONSENT_DOC.G_text))}</div>`;
     html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_TITLES.H))}</div>`;
+    html += tickAllBar(CONSENT_H.length);
     CONSENT_H.forEach((o, i) => { html += tickItem(i, L(o), !!S.consent.H[i]); });
     html += `<div class="consent-section-title" style="font-size:17px">${esc(L(CONSENT_TITLES.sign))}</div>`;
     html += `<div class="field-inline"><span>${zh ? "参与者姓名" : "Participant name"}</span>
@@ -1301,6 +1433,7 @@ function renderConsentStep() {
   }
 
   body.innerHTML = html;
+  setupTickAll();
   if (step === "REVIEW") setupSignatureCanvas();
 }
 
@@ -1479,6 +1612,7 @@ async function submitConsent() {
   const rec = buildConsentRecord();
   rec.stamp = stamp;
   S.consentRecord = rec;
+  saveSessionMeta();          // 同意一提交就落盘，之后崩溃也不必重签
 
   // 生成 PDF：英文（矢量，权威版，供 Nature）始终生成；中文显示时额外生成中文（图片版）
   try { S.consentPdfEn = await buildConsentPdf(rec, "en"); }
@@ -2093,8 +2227,7 @@ async function initDetector() {
     const fileset = await FilesetResolver.forVisionTasks(`${MEDIAPIPE_BASE}/wasm`);
     S.faceDetector = await FaceDetector.createFromOptions(fileset, {
       baseOptions: {
-        modelAssetPath:
-          "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+        modelAssetPath: "./models/blaze_face_short_range.tflite",
       },
       runningMode: "VIDEO",
     });
@@ -2222,6 +2355,7 @@ function startCameraTest() {
   $("testStatus").textContent = t("detecting");
   $("btnStartRec").textContent = t("start_record");
   $("btnStartRec").disabled = true;
+  document.querySelectorAll("[data-rotate]").forEach(el => { el.textContent = t("rotate_hint"); });
   show("screen-camtest");
 
   const { width:w, height:h } = S.camSettings;
@@ -2273,7 +2407,8 @@ function cancelRaf() {
 
 $("btnStartRec").addEventListener("click", () => {
   cancelRaf();
-  S.emotionIdx = 0;
+  S.emotionIdx = S.resumeIdx != null ? S.resumeIdx : 0;   // 续录时接着上次的进度
+  S.resumeIdx = null;
   showRecordPage();
 });
 
@@ -2286,6 +2421,8 @@ function showRecordPage() {
   const canvas = $("recCanvas"), overlay = $("recOverlay");
   canvas.width = overlay.width = w; canvas.height = overlay.height = h;
   sizeStage("stageRec", w, h);
+  document.querySelectorAll("[data-rotate]").forEach(el => { el.textContent = t("rotate_hint"); });
+  requestWakeLock();          // 手机端防止息屏中断录制（电脑端不请求）
   loadEmotion();
 }
 
@@ -2300,9 +2437,11 @@ function loadEmotion() {
   S.countdownNum = null;
   $("bigStatus").textContent = "";
   $("bigStatus").style.color = "#e04c64";
-  $("hintLbl").textContent = t("hint_idle");
+  $("hintLbl").textContent = t(IS_MOBILE ? "hint_idle_tap" : "hint_idle");
+  $("hintLbl").style.color = "";        // 清掉上一段可能残留的丢帧告警配色
   $("btnRow").innerHTML = "";
   S.state = "idle";
+  updateRecControls();
   startLivePreview();
 }
 
@@ -2326,6 +2465,8 @@ function startLivePreview() {
     } else if (S.state === "recording") {
       drawRecBadge(octx, w, h);
       S.recordFrameTimes.push(meta ? meta.mediaTime : now/1000);
+      // presentedFrames 是视频元素累计呈现的帧序号；相邻两次回调差值 >1 即为确凿丢帧
+      S.recordPresented.push(meta && meta.presentedFrames != null ? meta.presentedFrames : null);
     }
     if (S.state !== "review") S.rafId = src.requestVideoFrameCallback(loop);
   }
@@ -2340,8 +2481,46 @@ window.addEventListener("keydown", (e) => {
   else if (S.state === "recording") stopRecording();
 });
 
+/* 手机端：屏幕上的开始/停止录制按钮。电脑端不渲染任何按钮，仍然只用空格键。 */
+function updateRecControls() {
+  if (!IS_MOBILE) return;
+  const row = $("btnRow");
+  if (S.state === "review") return;            // 回放阶段的按钮由 showReview 负责
+  row.innerHTML = "";
+  const b = document.createElement("button");
+  b.className = "primary tap-rec";
+  if (S.state === "recording") {
+    b.classList.add("stop"); b.textContent = t("tap_stop"); b.onclick = stopRecording;
+  } else if (S.state === "counting") {
+    b.textContent = t("tap_counting"); b.disabled = true;
+  } else {
+    b.textContent = t("tap_start"); b.onclick = beginCountdown;
+  }
+  row.appendChild(b);
+}
+
+/* 手机端屏幕常亮：息屏会中断摄像头逐帧回调与录制（电脑端不请求） */
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!IS_MOBILE || !navigator.wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => { wakeLock = null; });
+  } catch { wakeLock = null; }
+}
+async function releaseWakeLock() {
+  try { if (wakeLock) await wakeLock.release(); } catch {}
+  wakeLock = null;
+}
+document.addEventListener("visibilitychange", () => {   // 切回前台后重新申请
+  if (document.visibilityState === "visible" && !wakeLock &&
+      $("screen-record").classList.contains("active")) requestWakeLock();
+});
+
 function beginCountdown() {
+  if (S.state !== "idle") return;
   S.state = "counting";
+  updateRecControls();
   countdown(COUNTDOWN_SEC);
 }
 
@@ -2374,18 +2553,40 @@ function pickMime() {
 
 function startRecording() {
   S.recordFrameTimes = [];
+  S.recordPresented = [];
   S.recChunks = [];
   const stream = $("recCanvas").captureStream(); // 录制干净的镜像画布（无叠加层）
   // 附加麦克风音轨，使成片包含同期音频
   if (S.camStream) for (const at of S.camStream.getAudioTracks()) stream.addTrack(at);
   const { mime, ext } = pickMime();
   S.mimeExt = ext;
-  S.recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  // 显式指定码率：不依赖浏览器默认值，保证画质与手机/电脑之间的一致性
+  const vTrack = S.camStream && S.camStream.getVideoTracks()[0];
+  const srcFps = (vTrack && vTrack.getSettings().frameRate) || 30;
+  const { width:vw, height:vh } = S.camSettings;
+  const opts = mime ? { mimeType: mime } : {};
+  opts.videoBitsPerSecond = targetVideoBitrate(vw, vh, srcFps);
+  opts.audioBitsPerSecond = AUDIO_BITRATE;
+  try {
+    S.recorder = new MediaRecorder(stream, opts);
+  } catch (e) {
+    // 极少数浏览器拒绝码率参数时回退到默认值，宁可画质降级也不能录不成
+    console.warn("MediaRecorder rejected bitrate options; falling back to defaults:", e);
+    S.recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  }
+  S.recSettings = {                      // 留档：请求值与浏览器实际采用值
+    video_bitrate_requested_bps: opts.videoBitsPerSecond,
+    video_bitrate_effective_bps: S.recorder.videoBitsPerSecond || null,
+    audio_bitrate_effective_bps: S.recorder.audioBitsPerSecond || null,
+    source_frame_rate: srcFps,
+    bits_per_pixel: VIDEO_BPP,
+  };
   S.recorder.ondataavailable = (e) => { if (e.data && e.data.size) S.recChunks.push(e.data); };
   S.recorder.onstop = finalizeRecording;
   S.recorder.start();
   S.state = "recording";
-  $("hintLbl").textContent = t("hint_recording");
+  $("hintLbl").textContent = t(IS_MOBILE ? "hint_recording_tap" : "hint_recording");
+  updateRecControls();
 }
 
 function stopRecording() {
@@ -2394,6 +2595,7 @@ function stopRecording() {
 
 function finalizeRecording() {
   const times = S.recordFrameTimes.slice();
+  const presented = S.recordPresented.slice();
   cancelRaf();
   // 清掉叠加层残留的 REC 徽标，避免盖在回放画面上
   const oc = $("recOverlay"); oc.getContext("2d").clearRect(0, 0, oc.width, oc.height);
@@ -2409,9 +2611,19 @@ function finalizeRecording() {
   else fps = 30;
   fps = Math.min(Math.max(fps, 1), 120);
 
-  S.cur = { blob, ext: S.mimeExt, timestamps: rel, fps };
+  // 丢帧统计：drops[i] = 第 i 帧之前被跳过的帧数（主线程卡顿导致相机帧未被呈现）
+  const drops = presented.map((p, i) =>
+    (i === 0 || p == null || presented[i-1] == null) ? 0 : Math.max(0, p - presented[i-1] - 1));
+  const dropped = drops.reduce((a, b) => a + b, 0);
+  if (dropped) {
+    console.warn(`[${EMOTIONS[S.emotionIdx]}] 丢帧 ${dropped} 帧（记录 ${rel.length} 帧，` +
+                 `采集期间相机共呈现 ${rel.length + dropped} 帧）`);
+  }
+
+  S.cur = { blob, ext: S.mimeExt, timestamps: rel, fps, presented, drops, dropped };
   S.state = "review";
-  $("bigStatus").textContent = t("done", { n: rel.length, fps: fps.toFixed(1) });
+  const cv = $("recCanvas");   // 录制画布尺寸即成片分辨率
+  $("bigStatus").textContent = t("done", { n: rel.length, fps: fps.toFixed(1), w: cv.width, h: cv.height });
   $("bigStatus").style.color = "#0ca88f";
   showReview();
 }
@@ -2425,7 +2637,17 @@ function showReview() {
   mk(t("replay"), playRecorded);
   mk(t("redo"), redo);
   mk(t("keep_next"), accept);
-  $("hintLbl").textContent = t("hint_review");
+  // 丢帧超过阈值时提示当场重录——事后才发现质量问题就来不及了
+  const cur = S.cur;
+  const total = (cur.timestamps.length + (cur.dropped || 0)) || 1;
+  const ratio = (cur.dropped || 0) / total;
+  if (ratio >= DROP_WARN_RATIO) {
+    $("hintLbl").textContent = t("drop_warn", { n: cur.dropped, p: (ratio * 100).toFixed(1) });
+    $("hintLbl").style.color = "var(--bad)";
+  } else {
+    $("hintLbl").textContent = t("hint_review");
+    $("hintLbl").style.color = "";
+  }
   playRecorded();
 }
 
@@ -2464,6 +2686,8 @@ function accept() {
   // 逐段上传：录完这段就在后台单独上传（不阻塞下一段录制）
   if (UPLOAD_URL) enqueueUpload({ key: emotion, run: () => uploadClip(emotion, clip) });
   S.emotionIdx += 1;
+  saveSessionClip(emotion, clip);   // 落盘后即使崩溃也只丢当前这一段
+  saveSessionMeta();
   if (S.emotionIdx >= EMOTIONS.length) finish();
   else loadEmotion();
 }
@@ -2473,6 +2697,7 @@ function accept() {
  * --------------------------------------------------------------------- */
 async function finish() {
   cancelRaf();
+  releaseWakeLock();
   if (S.camStream) S.camStream.getTracks().forEach(tk => tk.stop());
   S.finishedAt = currentTimestamp();
   $("btnDownload").textContent = t("download");
@@ -2497,6 +2722,8 @@ async function finish() {
     } else {
       // 全部上传成功：明确告知可关闭页面
       $("finishSaved").textContent = t("upload_done");
+      S.allDone = true;                 // 允许关闭页面，不再拦截
+      clearSession();                   // 数据已安全落到云端，清除本机暂存
       $("closeNote").textContent = t("all_done_close");
       $("closeNote").style.display = "block";
       $("btnDownload").textContent = t("download_backup");
@@ -2507,6 +2734,7 @@ async function finish() {
     $("finishTitle").style.color = "var(--good)";
     $("finishSaved").textContent = t("finish_saved");
     show("screen-finish");
+    S.allDone = true;                   // 仅本地保存模式：到此页即视为流程结束
   }
 }
 
@@ -2521,6 +2749,17 @@ function currentTimestamp() {
 /* ---- 逐段上传到 Google Drive（经 Apps Script 中转，凭证不下发浏览器） ---- */
 function enqueueUpload(task) { S.uploadQueue.push(task); processUploadQueue(); }
 
+/* 仍有片段未上传完时拦截关闭/刷新：文案由浏览器决定，但足以阻止误关导致数据丢失。
+   全部完成后（S.allDone）不再拦截，避免无谓打扰。 */
+window.addEventListener("beforeunload", (e) => {
+  const pending = S.uploading || S.uploadQueue.length > 0;
+  const unsaved = Object.keys(S.clips).length > 0 && !S.allDone;
+  if (!pending && !unsaved) return;
+  e.preventDefault();
+  e.returnValue = "";     // 部分浏览器需设置该值才会弹出确认框
+  return "";
+});
+
 async function processUploadQueue() {
   if (S.uploading) return;
   S.uploading = true;
@@ -2529,6 +2768,7 @@ async function processUploadQueue() {
     try { await task.run(); S.uploadStatus[task.key] = "ok"; }
     catch (e) { console.error("upload failed:", task.key, e); S.uploadStatus[task.key] = "fail"; }
     updateUploadInfo();
+    saveSessionMeta();                // 续录时据此跳过已成功上传的片段
   }
   S.uploading = false;
 }
@@ -2615,8 +2855,13 @@ async function putViaRelay(sessionUrl, blob) {
 }
 
 function clipTimestampsCsv(clip) {
-  let csv = "frame,time_sec\n";
-  clip.timestamps.forEach((x, i) => { csv += `${i},${x.toFixed(6)}\n`; });
+  // dropped_before：该帧之前被跳过的相机帧数（0 表示连续）；presented_frames 为浏览器累计呈现序号
+  let csv = "frame,time_sec,presented_frames,dropped_before\n";
+  clip.timestamps.forEach((x, i) => {
+    const p = clip.presented && clip.presented[i] != null ? clip.presented[i] : "";
+    const d = clip.drops ? clip.drops[i] : 0;
+    csv += `${i},${x.toFixed(6)},${p},${d}\n`;
+  });
   return csv;
 }
 
@@ -2667,13 +2912,24 @@ async function uploadMeta() {
 /* 元数据/索引构建（zip 下载与云端上传共用，保证两边内容一致） */
 function buildMeta(finishedAt) {
   const files = {};
-  for (const e of EMOTIONS) if (S.clips[e]) files[e] = `${e}.${S.clips[e].ext}`;
+  const droppedSummary = {};
+  for (const e of EMOTIONS) if (S.clips[e]) {
+    files[e] = `${e}.${S.clips[e].ext}`;
+    droppedSummary[e] = {
+      recorded_frames: S.clips[e].timestamps.length,
+      dropped_frames: S.clips[e].dropped || 0,
+    };
+  }
   const meta = {
     ...S.subject,
     emotions: EMOTIONS,
     camera_resolution: [S.camSettings.width, S.camSettings.height],
+    frames_mirrored: true,
+    note_mirrored: "画面为自拍镜像（左右翻转）：视频中位于画面左侧的是被试的右半张脸。" +
+                   "对 wink / asymmetric_* 等左右敏感的项目，下游分析必须先还原翻转。",
     audio_recorded: !!(S.camStream && S.camStream.getAudioTracks().length),
     recorder_mime: S.recorder ? S.recorder.mimeType : "",
+    recorder_settings: S.recSettings || null,   // 码率等编码参数，供后续质量核对
     user_agent: navigator.userAgent,
     note_fps: "实际帧率按每段录制的真实呈现时间戳（mediaTime）计算，见各 .timestamps.csv；视频本身按浏览器编码的可变帧率保存，播放速度正确。",
     consent: S.consentRecord ? {
@@ -2686,6 +2942,9 @@ function buildMeta(finishedAt) {
       folder: "../consent/",
     } : null,
     files, finished_at: finishedAt,
+    dropped_frames: droppedSummary,
+    note_dropped_frames: "主线程卡顿会使相机帧未被呈现，这些帧既不在视频里也不在时间戳里；" +
+                         "逐帧明细见各 .timestamps.csv 的 dropped_before 列。",
   };
   const header = ["subject_id","name","age","gender","nationality","created_at","finished_at","n_emotions"];
   const row = [S.subject.subject_id, S.subject.name, S.subject.age, S.subject.gender,
@@ -2703,12 +2962,11 @@ async function buildAndDownloadZip() {
   for (const emotion of EMOTIONS) {
     const clip = S.clips[emotion];
     if (!clip) continue;
-    const buf = new Uint8Array(await clip.blob.arrayBuffer());
-    entries.push({ name: `${sid}/recordings/${emotion}.${clip.ext}`, data: buf });
-    // 逐帧时间戳
-    let csv = "frame,time_sec\n";
-    clip.timestamps.forEach((x, i) => { csv += `${i},${x.toFixed(6)}\n`; });
-    entries.push({ name: `${sid}/recordings/${emotion}.timestamps.csv`, data: enc.encode(csv) });
+    // 直接挂 Blob，不读进内存（打包时只做流式 CRC）
+    entries.push({ name: `${sid}/recordings/${emotion}.${clip.ext}`, blob: clip.blob });
+    // 逐帧时间戳（与云端上传共用同一实现，保证两边内容一致）
+    entries.push({ name: `${sid}/recordings/${emotion}.timestamps.csv`,
+                   data: enc.encode(clipTimestampsCsv(clip)) });
   }
   const { meta, indexCsv } = buildMeta(S.finishedAt || currentTimestamp());
   entries.push({ name: `${sid}/recordings/metadata.json`, data: enc.encode(JSON.stringify(meta, null, 2)) });
@@ -2737,11 +2995,12 @@ async function buildAndDownloadZip() {
     }
   }
 
-  const zip = buildZipStore(entries);
-  const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
+  const zip = await buildZipStore(entries);
+  const url = URL.createObjectURL(zip);
   const a = document.createElement("a");
   a.href = url; a.download = `${sid}.zip`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+  clearSession();     // 数据已交付（本地 zip 或云端），清除本机暂存
 }
 
 function csvCell(v) {
@@ -2749,7 +3008,11 @@ function csvCell(v) {
   return /[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v;
 }
 
-/* ---- 极简 ZIP（store，无压缩；webm 已压缩，够用） ---- */
+/* ---- 极简 ZIP（store，无压缩；视频已压缩，够用） ----
+   条目支持两种形式：{ name, data: Uint8Array }（小文件）或 { name, blob: Blob }（视频）。
+   视频走 Blob 路径：CRC 以流式分块计算，最终用 new Blob([...]) 拼装，视频数据始终
+   留在浏览器的 Blob 存储里（可落盘），不会整份读进 JS 堆——避免高码率下打包时爆内存。
+   注意：ZIP 的 size/offset 为 32 位字段，总量超过 4 GB 需要 ZIP64，此处不支持（见下方告警）。 */
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
@@ -2759,40 +3022,60 @@ const CRC_TABLE = (() => {
   }
   return t;
 })();
-function crc32(bytes) {
-  let c = 0xFFFFFFFF;
+function crc32Update(c, bytes) {
   for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return c;
+}
+function crc32(bytes) {
+  return (crc32Update(0xFFFFFFFF, bytes) ^ 0xFFFFFFFF) >>> 0;
+}
+// 分块读取 Blob 计算 CRC32，峰值内存为单个分块大小
+async function crc32OfBlob(blob) {
+  if (!blob.stream) {                       // 老浏览器兜底：只能整份读入
+    return crc32(new Uint8Array(await blob.arrayBuffer()));
+  }
+  const reader = blob.stream().getReader();
+  let c = 0xFFFFFFFF;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    c = crc32Update(c, value);
+  }
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
-function buildZipStore(entries) {
+async function buildZipStore(entries) {
   const enc = new TextEncoder();
-  const chunks = [], central = [];
+  const parts = [], central = [];
   let offset = 0;
   const u16 = (n) => new Uint8Array([n & 255, (n>>8)&255]);
   const u32 = (n) => new Uint8Array([n&255, (n>>8)&255, (n>>16)&255, (n>>>24)&255]);
 
   for (const e of entries) {
     const name = enc.encode(e.name);
-    const crc = crc32(e.data);
-    const size = e.data.length;
-    const local = concat([
+    const payload = e.blob || e.data;                       // Blob 或 Uint8Array
+    const size = e.blob ? e.blob.size : e.data.length;
+    const crc = e.blob ? await crc32OfBlob(e.blob) : crc32(e.data);
+    const header = concat([
       u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
-      u32(crc), u32(size), u32(size), u16(name.length), u16(0), name, e.data,
+      u32(crc), u32(size), u32(size), u16(name.length), u16(0), name,
     ]);
-    chunks.push(local);
+    parts.push(header, payload);
     central.push(concat([
       u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
       u32(crc), u32(size), u32(size), u16(name.length), u16(0), u16(0), u16(0), u16(0),
       u32(0), u32(offset), name,
     ]));
-    offset += local.length;
+    offset += header.length + size;
+  }
+  if (offset > 0xFFFFFFFF) {
+    console.error("ZIP 总量超过 4 GB，32 位字段将溢出；请改用云端上传的数据。");
   }
   const cd = concat(central);
   const end = concat([
     u32(0x06054b50), u16(0), u16(0), u16(entries.length), u16(entries.length),
     u32(cd.length), u32(offset), u16(0),
   ]);
-  return concat([...chunks, cd, end]);
+  return new Blob([...parts, cd, end], { type: "application/zip" });
 }
 function concat(arrs) {
   let len = 0; for (const a of arrs) len += a.length;
@@ -2800,6 +3083,131 @@ function concat(arrs) {
   for (const a of arrs) { out.set(a, o); o += a.length; }
   return out;
 }
+
+
+/* --------------------------------------------------------------------- *
+ *  会话续录：把同意记录与已录片段暂存在参与者本机的 IndexedDB，
+ *  刷新 / 崩溃 / 手机切后台被回收后可从中断处继续，无需重签同意书。
+ *
+ *  隐私说明：暂存内容包含姓名、签名与人脸视频，保存在参与者自己的设备上。
+ *  全部完成（云端上传成功或本地 zip 下载完成）后会立即清除；参与者也可在
+ *  欢迎页选择「放弃并重新开始」手动清除。若伦理审批不允许在参与者设备上
+ *  暂存这些数据，把 SESSION_RESUME 改成 false 即可整体关闭该功能。
+ * --------------------------------------------------------------------- */
+const SESSION_RESUME = true;
+const SDB_NAME = "facial-recorder-session", SDB_VER = 1;
+let sdbPromise = null;
+
+function sdb() {
+  if (!SESSION_RESUME || !window.indexedDB) return Promise.resolve(null);
+  if (!sdbPromise) sdbPromise = new Promise((resolve) => {
+    let req;
+    try { req = indexedDB.open(SDB_NAME, SDB_VER); } catch { return resolve(null); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
+      if (!db.objectStoreNames.contains("clips")) db.createObjectStore("clips");
+    };
+    req.onsuccess = () => resolve(req.result);
+    // 隐私模式等场景下 IndexedDB 可能不可用：静默降级为「不支持续录」，不影响正常流程
+    req.onerror = () => { console.warn("IndexedDB unavailable; session resume disabled", req.error); resolve(null); };
+  });
+  return sdbPromise;
+}
+function sdbReq(store, mode, fn) {
+  return sdb().then(db => db && new Promise((resolve) => {
+    let tx;
+    try { tx = db.transaction(store, mode); } catch { return resolve(null); }
+    const r = fn(tx.objectStore(store));
+    tx.oncomplete = () => resolve(r ? r.result : null);
+    tx.onerror = tx.onabort = () => { console.warn("IndexedDB write failed", tx.error); resolve(null); };
+  }));
+}
+const sdbPut = (store, key, val) => sdbReq(store, "readwrite", (os) => os.put(val, key));
+const sdbGet = (store, key) => sdbReq(store, "readonly", (os) => os.get(key));
+const sdbEntries = (store) => sdbReq(store, "readonly", (os) => os.getAll()).then(vals =>
+  sdbReq(store, "readonly", (os) => os.getAllKeys()).then(keys =>
+    (keys || []).map((k, i) => [k, (vals || [])[i]])));
+
+async function saveSessionMeta() {
+  if (!S.subject || !S.subject.subject_id) return;
+  await sdbPut("meta", "current", {
+    subject: S.subject, consentRecord: S.consentRecord,
+    consentPdfEn: S.consentPdfEn || null, consentPdfZh: S.consentPdfZh || null,
+    lang: S.lang, emotionIdx: S.emotionIdx, uploadStatus: S.uploadStatus,
+    savedAt: Date.now(),
+  }).catch(() => {});
+}
+async function saveSessionClip(emotion, clip) {
+  await sdbPut("clips", emotion, {
+    ext: clip.ext, blob: clip.blob, timestamps: clip.timestamps,
+    presented: clip.presented, drops: clip.drops, dropped: clip.dropped, fps: clip.fps,
+  }).catch(() => {});
+}
+async function clearSession() {
+  await sdbReq("meta", "readwrite", (os) => os.clear()).catch(() => {});
+  await sdbReq("clips", "readwrite", (os) => os.clear()).catch(() => {});
+}
+async function loadSavedSession() {
+  const meta = await sdbGet("meta", "current");
+  if (!meta || !meta.subject || !meta.subject.subject_id) return null;
+  const clips = {};
+  for (const [k, v] of (await sdbEntries("clips")) || []) if (v) clips[k] = v;
+  return { meta, clips };
+}
+
+/* 欢迎页的「继续未完成的录制」提示条 */
+function renderResumeBox() {
+  const saved = S.pendingResume;
+  if (!saved) { $("resumeBox").style.display = "none"; return; }
+  $("resumeText").textContent = t("resume_found", {
+    sid: saved.meta.subject.subject_id, n: Object.keys(saved.clips).length, total: EMOTIONS.length });
+  $("btnResume").textContent = t("resume_go");
+  $("btnDiscard").textContent = t("resume_discard");
+  $("resumeBox").style.display = "";
+}
+
+async function resumeSession() {
+  const saved = S.pendingResume;
+  if (!saved) return;
+  S.pendingResume = null;
+  S.lang = saved.meta.lang || S.lang; updateLangButtons();
+  S.subject = saved.meta.subject;
+  S.consentRecord = saved.meta.consentRecord || null;
+  S.consentPdfEn = saved.meta.consentPdfEn || null;
+  S.consentPdfZh = saved.meta.consentPdfZh || null;
+  S.uploadStatus = saved.meta.uploadStatus || {};
+  S.clips = saved.clips;
+  S.emotionIdx = Math.min(saved.meta.emotionIdx || 0, EMOTIONS.length);
+  S.resumeIdx = S.emotionIdx;          // 摄像头检查通过后从这一段接着录，而不是从头开始
+  // 崩溃前未上传成功的片段重新排队（已成功的不会重复上传）
+  if (UPLOAD_URL) for (const e of EMOTIONS) {
+    if (S.clips[e] && S.uploadStatus[e] !== "ok") {
+      enqueueUpload({ key: e, run: () => uploadClip(e, S.clips[e]) });
+    }
+  }
+  if (S.emotionIdx >= EMOTIONS.length) { finish(); return; }   // 只差收尾上传
+  renderInstructions();
+  show("screen-instr");
+}
+
+$("btnResume").addEventListener("click", () => { resumeSession(); });
+$("btnDiscard").addEventListener("click", async () => {
+  if (!confirm(t("resume_discard_confirm"))) return;
+  await clearSession();
+  S.pendingResume = null;
+  renderResumeBox();
+});
+
+// 启动时探测是否存在未完成的会话
+(async () => {
+  try {
+    const saved = await loadSavedSession();
+    if (!saved) return;
+    S.pendingResume = saved;
+    renderResumeBox();
+  } catch (e) { console.warn("resume probe failed", e); }
+})();
 
 /* --------------------------------------------------------------------- *
  *  初始化：欢迎页 -> PIS -> 同意书 -> 过渡页 -> 注册 -> 录制
